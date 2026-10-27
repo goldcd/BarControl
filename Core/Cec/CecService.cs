@@ -30,6 +30,7 @@ public class CecService : IDisposable
     public CecAudioStatus AudioStatus { get; private set; } = new(false, 0);
 
     public bool AutoPowerSyncEnabled { get; set; } = true;
+    public bool WakeOnStartupEnabled { get; set; } = false;
     public volatile bool IsUiActive = true;
 
     public CecVolumeController VolumeController { get; }
@@ -42,15 +43,16 @@ public class CecService : IDisposable
         VolumeController = new CecVolumeController(this);
         VolumeController.VolumeStateChanged += () => StateChanged?.Invoke();
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        SystemEvents.SessionEnding += OnSessionEnding;
     }
 
     public async Task InitializeAsync()
     {
-        await Task.Run(() =>
+        bool connected = await Task.Run(() =>
         {
             lock (_lock)
             {
-                if (IsConnected || _isConnecting) return;
+                if (IsConnected || _isConnecting) return false;
                 _isConnecting = true;
             }
 
@@ -59,7 +61,9 @@ public class CecService : IDisposable
                 if (ConnectOrReconnectAdapterInternal())
                 {
                     StartBackgroundMonitor();
+                    return true;
                 }
+                return false;
             }
             finally
             {
@@ -70,6 +74,13 @@ public class CecService : IDisposable
                 StateChanged?.Invoke();
             }
         });
+
+        // If Wake on Startup is enabled and the soundbar is in Standby when the PC boots/starts BarControl, wake it up
+        if (connected && WakeOnStartupEnabled && PowerStatus != LibCec.CEC_POWER_STATUS_ON)
+        {
+            LogService.LogInfo($"CEC: Soundbar is in state {PowerStatus} on startup with WakeOnStartup enabled; waking soundbar...");
+            await PowerOnSoundbarAsync();
+        }
     }
 
     /// <summary>
@@ -638,6 +649,46 @@ public class CecService : IDisposable
         }
     }
 
+    private void OnSessionEnding(object sender, SessionEndingEventArgs e)
+    {
+        LogService.LogInfo($"CEC: Windows SessionEnding received (Reason={e.Reason}).");
+        if (e.Reason == SessionEndReasons.SystemShutdown && AutoPowerSyncEnabled && IsConnected)
+        {
+            SendImmediateStandbyForShutdown();
+        }
+    }
+
+    /// <summary>
+    /// Synchronously transmits discrete CEC Standby commands during Windows shutdown
+    /// before the OS terminates the process. Uses only discrete idempotent standby opcodes
+    /// so it completes in ~200ms and never toggles a sleeping soundbar back on.
+    /// </summary>
+    public void SendImmediateStandbyForShutdown()
+    {
+        lock (_lock)
+        {
+            if (_isDisposed || !IsConnected || _conn == IntPtr.Zero) return;
+
+            try
+            {
+                LogService.LogInfo("CEC: Sending synchronous discrete Standby (0x36 + 0x6C) for PC Shutdown...");
+                var standbyCmd = CecCommand.Create(
+                    LibCec.CECDEVICE_RECORDINGDEVICE1,
+                    TargetLogicalAddress,
+                    LibCec.CEC_OPCODE_STANDBY);
+                LibCec.libcec_transmit(_conn, ref standbyCmd);
+
+                LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, LibCec.CEC_USER_CONTROL_CODE_POWER_OFF_FUNCTION, 1);
+                LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
+                PowerStatus = LibCec.CEC_POWER_STATUS_STANDBY;
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError("CEC: Error sending shutdown standby", ex);
+            }
+        }
+    }
+
     public void Dispose()
     {
         lock (_lock)
@@ -652,6 +703,7 @@ public class CecService : IDisposable
             VolumeController.Dispose();
 
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+            SystemEvents.SessionEnding -= OnSessionEnding;
 
             if (_conn != IntPtr.Zero)
             {

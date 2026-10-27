@@ -17,6 +17,7 @@ public class AppSettings
 
     // HDMI-CEC Settings
     public bool CecPowerSyncEnabled { get; set; } = true;
+    public bool CecWakeOnStartupEnabled { get; set; } = false;
     public bool BitstreamVolumeProxyEnabled { get; set; } = true;
     public string? SelectedSoundbarIdentifier { get; set; }
 }

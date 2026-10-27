@@ -31,19 +31,25 @@ A Windows utility designed for seamless HDMI soundbar integration. BarControl so
 
 ### ⚡ Getting Started
 
-#### Option A: Download Standalone Executable (Recommended)
-1. Go to **[Releases](https://github.com/goldcd/BarControl/releases/latest)**.
-2. Download **`BarControl.exe`**.
-3. Run it from anywhere — no installation or external runtimes required.
+#### Option A: One-Line PowerShell Installer (Recommended)
+Open PowerShell (no administrator rights required) and paste:
+```powershell
+irm https://raw.githubusercontent.com/goldcd/BarControl/main/install.ps1 | iex
+```
+*What this does: downloads the latest `BarControl.exe` from GitHub Releases, installs it cleanly to `%LocalAppData%\Programs\BarControl`, creates a Start Menu shortcut, registers it in **Windows Settings > Apps > Installed Apps** (with full uninstaller support), and launches BarControl.*
 
-#### Option B: One-Click Installer (Local)
+#### Option B: Local One-Click Installer
 1. Download or clone this repository.
 2. Double-click **`install.cmd`** (no administrator rights needed).
    - Installs cleanly to `%LocalAppData%\Programs\BarControl`
    - Creates a Start Menu shortcut
-   - Adds BarControl to Windows Settings > Installed Apps
+   - Adds BarControl to **Windows Settings > Apps > Installed Apps**
 
-#### Option C: Build from Source
+#### Option C: Standalone Executable or Setup Wizard
+1. Go to **[Releases](https://github.com/goldcd/BarControl/releases/latest)**.
+2. Download **`BarControl-Setup.exe`** (standard Windows installer wizard) or **`BarControl.exe`** (portable single-file executable).
+
+#### Option D: Build from Source
 ```cmd
 git clone https://github.com/goldcd/BarControl.git
 cd BarControl

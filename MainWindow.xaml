@@ -7,8 +7,8 @@
         mc:Ignorable="d"
         Title="BarControl - Soundbar &amp; HDMI-CEC Control"
         Icon="pack://application:,,,/Assets/app.ico"
-        Height="785" Width="680"
-        MinHeight="720" MinWidth="580"
+        Height="845" Width="680"
+        MinHeight="770" MinWidth="580"
         WindowStartupLocation="CenterScreen"
         Background="#161618"
         Foreground="#EDEDED"
@@ -502,6 +502,27 @@
                         </Border>
 
                         <!-- Checkbox Option 1: Standby & Wake Sync -->
+                        <Border Background="#25252A" CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Auto-Power Sync (Sleep / Wake / Shutdown)" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock Text="Turn soundbar off when PC sleeps or shuts down, and wake it when PC resumes from sleep."
+                                               FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                </StackPanel>
+
+                                <CheckBox Grid.Column="1"
+                                          IsChecked="{Binding IsPowerSyncEnabled}"
+                                          VerticalAlignment="Center"
+                                          Cursor="Hand"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Checkbox Option 2: Wake on PC Boot / App Startup -->
                         <Border Background="#25252A" CornerRadius="6" Padding="12,10" Margin="0,0,0,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -510,13 +531,13 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="Auto-Power Sync (Sleep / Wake)" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
-                                    <TextBlock Text="Turn soundbar off when PC enters standby, and wake it up when PC wakes up."
+                                    <TextBlock Text="Turn Soundbar On with PC Boot" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock Text="Automatically wake the soundbar when your PC boots up and BarControl starts."
                                                FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                 </StackPanel>
 
                                 <CheckBox Grid.Column="1"
-                                          IsChecked="{Binding IsPowerSyncEnabled}"
+                                          IsChecked="{Binding IsWakeOnStartupEnabled}"
                                           VerticalAlignment="Center"
                                           Cursor="Hand"/>
                             </Grid>

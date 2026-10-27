@@ -193,6 +193,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         if (_cecService != null)
         {
             _cecService.AutoPowerSyncEnabled = _settings.CecPowerSyncEnabled;
+            _cecService.WakeOnStartupEnabled = _settings.CecWakeOnStartupEnabled;
             _cecService.StateChanged += OnCecStateChanged;
         }
 
@@ -200,6 +201,12 @@ public class MainWindowViewModel : INotifyPropertyChanged
         {
             _bitstreamProxyService.IsEnabled = _settings.BitstreamVolumeProxyEnabled;
             _bitstreamProxyService.StateChanged += OnBitstreamProxyStateChanged;
+        }
+
+        if (_settings.StartWithWindows)
+        {
+            // Ensure the Windows Run registry entry points to the current executable path (e.g. after install)
+            StartupService.SetStartup(true);
         }
 
         _isGuardActive = _settings.IsGuardEnabled;
@@ -540,6 +547,24 @@ public class MainWindowViewModel : INotifyPropertyChanged
                 if (_cecService != null)
                 {
                     _cecService.AutoPowerSyncEnabled = value;
+                }
+                SaveSettings();
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsWakeOnStartupEnabled
+    {
+        get => _settings.CecWakeOnStartupEnabled;
+        set
+        {
+            if (_settings.CecWakeOnStartupEnabled != value)
+            {
+                _settings.CecWakeOnStartupEnabled = value;
+                if (_cecService != null)
+                {
+                    _cecService.WakeOnStartupEnabled = value;
                 }
                 SaveSettings();
                 OnPropertyChanged();

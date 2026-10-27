@@ -17,6 +17,11 @@ $repoName = "BarControl"
 $releaseUrl = "https://github.com/$repoOwner/$repoName/releases/latest/download/BarControl.exe"
 $rawBaseUrl = "https://raw.githubusercontent.com/$repoOwner/$repoName/main"
 
+# Stop any running BarControl instances first so target files aren't locked
+Write-Host "Checking for running BarControl instances..." -ForegroundColor Gray
+Get-Process -Name "BarControl" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
+
 # Create destination directory
 if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
@@ -155,9 +160,16 @@ if (Test-Path $targetExe) {
 Set-ItemProperty -Path $uninstallRegKey -Name "DisplayName" -Value "BarControl - Soundbar & HDMI-CEC Control"
 Set-ItemProperty -Path $uninstallRegKey -Name "DisplayVersion" -Value $appVersion
 Set-ItemProperty -Path $uninstallRegKey -Name "Publisher" -Value "goldcd"
-Set-ItemProperty -Path $uninstallRegKey -Name "DisplayIcon" -Value $targetExe
+Set-ItemProperty -Path $uninstallRegKey -Name "DisplayIcon" -Value $(if (Test-Path $iconPath) { $iconPath } else { $targetExe })
 Set-ItemProperty -Path $uninstallRegKey -Name "InstallLocation" -Value $installDir
 Set-ItemProperty -Path $uninstallRegKey -Name "UninstallString" -Value "`"$uninstallCmd`""
+Set-ItemProperty -Path $uninstallRegKey -Name "QuietUninstallString" -Value "`"$uninstallCmd`""
+Set-ItemProperty -Path $uninstallRegKey -Name "URLInfoAbout" -Value "https://github.com/$repoOwner/$repoName"
+Set-ItemProperty -Path $uninstallRegKey -Name "InstallDate" -Value (Get-Date -Format "yyyyMMdd")
+if (Test-Path $targetExe) {
+    $sizeKb = [int][Math]::Ceiling((Get-Item $targetExe).Length / 1KB)
+    Set-ItemProperty -Path $uninstallRegKey -Name "EstimatedSize" -Value $sizeKb -Type DWord
+}
 Set-ItemProperty -Path $uninstallRegKey -Name "NoModify" -Value 1 -Type DWord
 Set-ItemProperty -Path $uninstallRegKey -Name "NoRepair" -Value 1 -Type DWord
 
