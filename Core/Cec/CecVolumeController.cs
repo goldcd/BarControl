@@ -239,11 +239,12 @@ public class CecVolumeController : IDisposable
                 }
 
                 // Adaptive burst sizing:
-                // - Large gap (> 12%): 3 steps per burst before checking audio status
-                // - Medium gap (5..12%): 2 steps per burst
+                // - Large gap (>= 18%): up to 7 steps per burst
+                // - Medium-large gap (10..17%): 4 steps per burst
+                // - Medium gap (5..9%): 2 steps per burst
                 // - Close gap (1..4%): 1 step for fine landing
                 int absDiff = Math.Abs(diff);
-                int burstSteps = absDiff > 12 ? 3 : (absDiff > 4 ? 2 : 1);
+                int burstSteps = absDiff >= 18 ? 7 : (absDiff >= 10 ? 4 : (absDiff >= 5 ? 2 : 1));
 
                 var updatedStatus = _cecService.ExecuteVolumeStepBurst(direction > 0, burstSteps);
 
@@ -256,22 +257,7 @@ public class CecVolumeController : IDisposable
                     if (actual == previousActual)
                     {
                         stalledCount++;
-                        // If hardware hasn't moved after 3 consecutive bursts, force a wire query once on burst 2,
-                        // and abort on burst 4 so we never loop infinitely at hardware limits.
-                        if (stalledCount == 2)
-                        {
-                            var wireStatus = _cecService.QueryAudioStatusFromWire();
-                            if (wireStatus.VolumePercent >= 0 && wireStatus.VolumePercent <= 100)
-                            {
-                                OnHardwareAudioStatusReported(wireStatus, syncRequestedIfIdle: false);
-                                actual = wireStatus.VolumePercent;
-                                if (actual != previousActual)
-                                {
-                                    stalledCount = 0;
-                                }
-                            }
-                        }
-                        else if (stalledCount >= 4)
+                        if (stalledCount >= 3)
                         {
                             LogService.LogInfo($"CEC Volume Chaser: Hardware volume stalled at {actual}% (target {target}%). Stopping chase.");
                             break;
@@ -290,17 +276,7 @@ public class CecVolumeController : IDisposable
                 lastDirection = direction;
 
                 // Brief yield so UI updates smoothly and user slider movements can preempt next iteration
-                await Task.Delay(15, token);
-            }
-
-            // Do one final wire confirmation query after settling so ActualVolume is 100% accurate
-            if (_cecService.IsConnected && !token.IsCancellationRequested)
-            {
-                var finalStatus = _cecService.QueryAudioStatusFromWire();
-                if (finalStatus.VolumePercent >= 0 && finalStatus.VolumePercent <= 100)
-                {
-                    OnHardwareAudioStatusReported(finalStatus, syncRequestedIfIdle: false);
-                }
+                await Task.Delay(5, token);
             }
         }
         finally

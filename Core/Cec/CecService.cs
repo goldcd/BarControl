@@ -18,6 +18,7 @@ public class CecService : IDisposable
     private bool _isDisposed;
     private bool _isConnecting;
     private bool _isActionInProgress;
+    private int _metadataQueryAttempts;
     private CancellationTokenSource? _pollCts;
 
     public int TargetLogicalAddress { get; set; } = LibCec.CECDEVICE_AUDIOSYSTEM;
@@ -196,6 +197,7 @@ public class CecService : IDisposable
                 _conn = conn;
                 IsConnected = true;
                 AdapterPort = comPort;
+                _metadataQueryAttempts = 0;
             }
             LogService.LogInfo($"CEC: Connected successfully on {comPort}");
 
@@ -232,9 +234,12 @@ public class CecService : IDisposable
                 LibCec.CEC_OPCODE_GIVE_DEVICE_POWER_STATUS);
             LibCec.libcec_transmit(_conn, ref pwrCmd);
 
-            Thread.Sleep(120);
+            Thread.Sleep(80);
             int pwr = LibCec.libcec_get_device_power_status(_conn, TargetLogicalAddress);
             PowerStatus = pwr;
+
+            // Yield immediately if the user started dragging the volume slider during the power query
+            if (VolumeController.IsChasing) return;
 
             // 2. Query audio status directly from the wire (0x71) strictly to TargetLogicalAddress
             var audioCmd = CecCommand.Create(
@@ -243,37 +248,41 @@ public class CecService : IDisposable
                 LibCec.CEC_OPCODE_GIVE_AUDIO_STATUS);
             LibCec.libcec_transmit(_conn, ref audioCmd);
 
-            Thread.Sleep(120);
+            Thread.Sleep(80);
             byte rawAudio = LibCec.libcec_audio_get_status(_conn);
             bool isMuted = (rawAudio & 0x80) != 0;
             int vol = rawAudio & 0x7F;
             AudioStatus = new CecAudioStatus(isMuted, vol);
             VolumeController.OnHardwareAudioStatusReported(AudioStatus, syncRequestedIfIdle: true);
 
-            // 3. Only query OSD name if not yet resolved
-            if (SoundbarName == "HDMI Soundbar")
+            // 3. Query OSD name & Vendor at most 3 times after connecting so we don't block the CEC bus on every poll
+            if (_metadataQueryAttempts < 3)
             {
-                byte[] nameBuf = new byte[64];
-                if (LibCec.libcec_get_device_osd_name(_conn, TargetLogicalAddress, nameBuf) == 1)
+                _metadataQueryAttempts++;
+
+                if (SoundbarName == "HDMI Soundbar")
                 {
-                    string osd = Encoding.ASCII.GetString(nameBuf).TrimEnd('\0').Trim();
-                    if (!string.IsNullOrEmpty(osd))
+                    byte[] nameBuf = new byte[64];
+                    if (LibCec.libcec_get_device_osd_name(_conn, TargetLogicalAddress, nameBuf) == 1)
                     {
-                        SoundbarName = osd;
+                        string osd = Encoding.ASCII.GetString(nameBuf).TrimEnd('\0').Trim();
+                        if (!string.IsNullOrEmpty(osd))
+                        {
+                            SoundbarName = osd;
+                        }
                     }
                 }
-            }
 
-            // 4. Only query Vendor if not yet resolved
-            if (SoundbarVendor == "Unknown")
-            {
-                uint vendorId = LibCec.libcec_get_device_vendor_id(_conn, TargetLogicalAddress);
-                byte[] vendorBuf = new byte[64];
-                LibCec.libcec_vendor_id_to_string(vendorId, vendorBuf, (UIntPtr)64);
-                string vendor = Encoding.ASCII.GetString(vendorBuf).TrimEnd('\0').Trim();
-                if (!string.IsNullOrEmpty(vendor))
+                if (SoundbarVendor == "Unknown")
                 {
-                    SoundbarVendor = vendor;
+                    uint vendorId = LibCec.libcec_get_device_vendor_id(_conn, TargetLogicalAddress);
+                    byte[] vendorBuf = new byte[64];
+                    LibCec.libcec_vendor_id_to_string(vendorId, vendorBuf, (UIntPtr)64);
+                    string vendor = Encoding.ASCII.GetString(vendorBuf).TrimEnd('\0').Trim();
+                    if (!string.IsNullOrEmpty(vendor))
+                    {
+                        SoundbarVendor = vendor;
+                    }
                 }
             }
         }
@@ -295,8 +304,8 @@ public class CecService : IDisposable
             {
                 try
                 {
-                    // Fast responsive polling (500ms) when UI is active; throttled (5000ms) when minimized/hidden
-                    int pollDelay = IsUiActive ? 500 : 5000;
+                    // Responsive polling (1200ms) when UI is active without saturating the CEC bus; throttled (5000ms) when hidden
+                    int pollDelay = IsUiActive ? 1200 : 5000;
                     await Task.Delay(pollDelay, token);
                     if (token.IsCancellationRequested) break;
 
@@ -340,8 +349,8 @@ public class CecService : IDisposable
     }
 
     /// <summary>
-    /// Sends a small burst of Volume Up or Down keypresses (followed by a single release) and reads the updated
-    /// audio status reported back by the soundbar. Used by CecVolumeController's closed-loop chaser.
+    /// Sends a burst of discrete Volume Up or Down keypress/release pairs and queries the updated
+    /// audio status (0x71) directly from the soundbar over the wire. Used by CecVolumeController's closed-loop chaser.
     /// </summary>
     internal CecAudioStatus ExecuteVolumeStepBurst(bool up, int steps)
     {
@@ -350,22 +359,33 @@ public class CecService : IDisposable
             if (_conn == IntPtr.Zero || !IsConnected) return new CecAudioStatus(false, -1);
 
             int code = up ? LibCec.CEC_USER_CONTROL_CODE_VOLUME_UP : LibCec.CEC_USER_CONTROL_CODE_VOLUME_DOWN;
-            int count = Math.Clamp(steps, 1, 5);
+            int count = Math.Clamp(steps, 1, 8);
 
             for (int i = 0; i < count; i++)
             {
+                // If user dragged slider back the other way mid-burst, stop stepping immediately
+                int currentReq = VolumeController.RequestedVolume;
+                int currentAct = VolumeController.ActualVolume;
+                if ((up && currentReq <= currentAct) || (!up && currentReq >= currentAct))
+                {
+                    break;
+                }
+
                 LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, code, 1);
+                LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
                 if (i < count - 1)
                 {
-                    // Brief spacing between consecutive presses so soundbar processes each step reliably
-                    Thread.Sleep(45);
+                    Thread.Sleep(15);
                 }
             }
 
-            LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
-
-            // Allow soundbar's automatic <Report Audio Status> (0x7A) frame to arrive
-            Thread.Sleep(55);
+            // Explicitly query <Give Audio Status> (0x71) from the wire so AudioStatus reflects the new hardware volume immediately
+            var audioCmd = CecCommand.Create(
+                LibCec.CECDEVICE_RECORDINGDEVICE1,
+                TargetLogicalAddress,
+                LibCec.CEC_OPCODE_GIVE_AUDIO_STATUS);
+            LibCec.libcec_transmit(_conn, ref audioCmd);
+            Thread.Sleep(75);
 
             byte rawAudio = LibCec.libcec_audio_get_status(_conn);
             bool isMuted = (rawAudio & 0x80) != 0;
