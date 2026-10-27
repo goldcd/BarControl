@@ -1,6 +1,6 @@
 # BarControl
 
-A Windows utility designed for seamless HDMI soundbar integration. BarControl solves the common headaches of using an HDMI soundbar or AV receiver with a PC: guarding phantom displays, preventing audio sleep, and providing **HDMI-CEC hardware control** via the **Pulse-Eight USB-CEC Adapter**.
+A lightweight Windows system tray utility designed for seamless HDMI soundbar and AV receiver integration. BarControl solves the everyday headaches of connecting an HDMI soundbar to a PC: guarding phantom displays, preventing audio sleep/clipping, bridging Dolby Atmos volume controls, and providing **HDMI-CEC hardware power & volume management** via the **Pulse-Eight USB-CEC Adapter**.
 
 ![BarControl Screenshot](Assets/screenshot.png)
 
@@ -10,20 +10,24 @@ A Windows utility designed for seamless HDMI soundbar integration. BarControl so
 
 ### The Problems
 1. **Phantom Displays & Window Trapping**:
-   When connecting an HDMI soundbar (such as a Panasonic SoundSlayer) or AV receiver to a Windows PC, Windows detects the HDMI connection as a display monitor. Disabling it cuts audio completely; leaving it enabled causes windows and mouse cursors to get lost on a non-existent screen.
+   When connecting an HDMI soundbar (such as a Panasonic SoundSlayer) or AV receiver to a Windows PC, Windows treats the HDMI connection as an active display monitor. Disabling it in Display Settings cuts HDMI audio completely; leaving it enabled causes application windows, dialogs, and mouse cursors to get lost on a non-existent screen.
 2. **Audio Sleep / Startup Clipping**:
-   HDMI soundbars frequently sleep when idle, cutting off the first few seconds of notification sounds or audio playback.
+   Digital HDMI soundbars frequently enter a power-saving sleep state when silent, cutting off the first 1–2 seconds of notification sounds or audio playback while the HDMI clock re-syncs.
 3. **Dolby Atmos / Bitstream Volume Lockout**:
-   When streaming Dolby Atmos, DTS, or direct bitstream audio, Windows volume controls are bypassed. Users are left unable to change volume with Windows volume keys or sliders.
+   When streaming Dolby Atmos, DTS, or exclusive bitstream audio (e.g., Netflix, games, or media players), Windows volume controls are bypassed and locked at 100%, leaving keyboard volume keys/wheels non-functional.
 4. **Power State Desync**:
-   Soundbars often stay powered on indefinitely when the PC sleeps, or fail to wake automatically when audio playback begins.
+   Soundbars stay powered on indefinitely when the PC sleeps or shuts down, or fail to wake automatically when the PC resumes.
 
 ### The BarControl Solution
-- **Phantom Display Guard**: Prevents windows from getting trapped on the soundbar display, instantly redirecting them back to your primary monitor while preserving window dimensions.
-- **Continuous Audio Keep-Alive**: Generates imperceptible sub-audible keep-alive signals to keep the HDMI audio pipeline primed.
-- **Pulse-Eight HDMI-CEC Control**:
-  - **Power Sync**: Automatically turns the soundbar ON/OFF (Standby) in sync with PC sleep/wake and display activity.
-  - **CEC Volume Proxy & Bridge**: Detects the soundbar via CEC, interrogates supported volume range, and transparently proxies Windows volume changes to the soundbar over CEC during direct Atmos/DTS streaming.
+- **Phantom Display Guard**: Keeps your HDMI soundbar enabled for audio while actively guarding the phantom display—instantly bouncing any window dragged, launched, or moved (e.g., via `Win + Shift + Arrow`) back to your primary monitor with its original size and coordinates preserved.
+- **Continuous Audio Keep-Alive**: Streams an imperceptible sub-bit WASAPI signal targeted strictly to your soundbar endpoint so it never falls into idle sleep or clips the beginning of sounds.
+- **HDMI-CEC Power & Volume Management**:
+  - **Closed-Loop Volume Slider**: Directly controls and monitors your soundbar's hardware amplifier volume (`0–100%`) over HDMI-CEC with dual target and actual indicators.
+  - **Auto-Power Sync (Sleep / Wake / Shutdown)**: Automatically puts the soundbar into discrete CEC Standby when the PC sleeps or shuts down, and wakes it when Windows resumes from sleep.
+  - **Turn Soundbar On with PC Boot**: Separate toggle to choose whether starting Windows / BarControl automatically wakes the soundbar.
+  - **Manual Turn On / Turn Off**: One-click discrete power control directly from the UI.
+- **Dolby Atmos / Bitstream Volume Proxy**:
+  - Automatically detects when an exclusive bitstream (Dolby Atmos / DTS) takes over the audio endpoint, snapshots your pre-stream Windows & Soundbar volume levels, transparently relays keyboard volume/mute keys directly to the soundbar over HDMI-CEC, and restores your prior volume levels when playback stops.
 
 ---
 
@@ -38,16 +42,17 @@ irm https://raw.githubusercontent.com/goldcd/BarControl/main/install.ps1 | iex
 ```
 *What this does: downloads the latest `BarControl.exe` from GitHub Releases, installs it cleanly to `%LocalAppData%\Programs\BarControl`, creates a Start Menu shortcut, registers it in **Windows Settings > Apps > Installed Apps** (with full uninstaller support), and launches BarControl.*
 
-#### Option B: Local One-Click Installer
+#### Option B: Download Standalone Executable
+1. Go to **[Releases](https://github.com/goldcd/BarControl/releases/latest)**.
+2. Download **`BarControl.exe`**.
+3. Run it from anywhere — no installation or external runtimes required.
+
+#### Option C: Local One-Click Installer
 1. Download or clone this repository.
 2. Double-click **`install.cmd`** (no administrator rights needed).
    - Installs cleanly to `%LocalAppData%\Programs\BarControl`
    - Creates a Start Menu shortcut
    - Adds BarControl to **Windows Settings > Apps > Installed Apps**
-
-#### Option C: Standalone Executable or Setup Wizard
-1. Go to **[Releases](https://github.com/goldcd/BarControl/releases/latest)**.
-2. Download **`BarControl-Setup.exe`** (standard Windows installer wizard) or **`BarControl.exe`** (portable single-file executable).
 
 #### Option D: Build from Source
 ```cmd
@@ -55,60 +60,59 @@ git clone https://github.com/goldcd/BarControl.git
 cd BarControl
 publish.cmd
 ```
-*`publish.cmd` builds the standalone, self-contained single-file executable to `dist\BarControl.exe` (note: `dist/` is `.gitignore`d to prevent large binary bloat in the git repository).*
+*`publish.cmd` builds the standalone, self-contained single-file executable to `dist\BarControl.exe` (automatically stamped with the latest Git tag version).*
 
 ---
 
 ### How to Use BarControl
-1. **Select Your Soundbar / HDMI Audio Device**:
-   - Open BarControl (it opens on start, or left-click its system tray icon by the clock).
-   - Select your HDMI soundbar display from the dropdown at the top.
-   - **Phantom Display Guard**: Enable to prevent windows and dialogs from getting trapped on the phantom soundbar display (your primary monitor is automatically protected).
-   - **Continuous Audio Keep-Alive**: Enable to stream an imperceptible sub-bit WASAPI signal to prevent soundbar sleep and audio startup clipping.
-2. **HDMI-CEC Power & Volume Control**:
+1. **Select Soundbar / HDMI Audio Device**:
+   - Open BarControl (it opens on start, or left-click its soundbar icon in the system tray).
+   - Select your HDMI soundbar from the dropdown at the top (e.g., `SOUNDSLAYER`).
+   - **Phantom Display Guard**: Prevents windows and dialogs from getting trapped on the phantom soundbar display (your primary monitor is automatically protected from exclusion).
+   - **Continuous Audio Keep-Alive**: Streams an imperceptible signal to prevent soundbar idle sleep and audio startup clipping.
+2. **HDMI-CEC Power Management**:
    - Automatically discovers your Pulse-Eight USB-CEC adapter and connected HDMI soundbar.
-   - Use the **closed-loop volume slider** (with dual target & actual hardware indicators) or `🔉` / `🔊` step buttons.
-   - Toggle **Auto-Power Sync (Sleep / Wake)** to automatically put your soundbar into standby when Windows sleeps/hibernates and wake it when Windows resumes.
-3. **Dolby Atmos / Bitstream CEC Volume Proxy**:
-   - Automatically detects when an exclusive bitstream (such as Netflix Dolby Atmos or DTS) locks the audio endpoint.
-   - Bridges your keyboard volume keys/wheel and mute controls directly to the soundbar over HDMI-CEC, and restores your previous Windows & Soundbar volume levels when the stream ends.
+   - Drag the **volume slider** or click the mute/unmute buttons to adjust hardware soundbar volume in real time.
+   - **Auto-Power Sync (Sleep / Wake / Shutdown)**: Puts the soundbar into standby when your PC sleeps or shuts down, and wakes it when your PC resumes from sleep.
+   - **Turn Soundbar On with PC Boot**: Independently choose whether the soundbar should automatically power on when your PC boots up.
+   - **Turn On / Turn Off**: Manually toggle your soundbar's power state at any time.
+3. **Dolby Atmos / Bitstream Volume Proxy**:
+   - Enable **Seamless Keyboard Volume Bridge & Auto-Restore**.
+   - While in normal audio playback, the status badge reads `STANDBY (PCM)`.
+   - As soon as Dolby Atmos / DTS bitstream playback begins, the card switches to `⚡ ATMOS / BITSTREAM ACTIVE`, forwarding keyboard volume & mute keys to your soundbar over HDMI-CEC and restoring your prior volume levels once the stream ends.
 4. **In-App Auto-Updater**:
    - Automatically checks GitHub Releases for newer versions and provides a one-click **Update** button in the footer bar.
 5. **Tray Controls (by the Clock)**:
-   - **Left-Click**: Instantly opens / restores the BarControl GUI.
+   - **Left-Click**: Instantly opens / restores the BarControl window.
    - **Right-Click**: Opens the quick menu (*Open BarControl*, *Guard: Active/Paused toggle*, and *Exit*).
 
-To uninstall completely, run `uninstall.cmd` or uninstall from **Windows Settings > Apps > Installed Apps**.
-
+To uninstall completely, run `uninstall.cmd` or uninstall directly from **Windows Settings > Apps > Installed Apps**.
 
 ---
 
 ## 3. Technical Details
-
-For anyone interested in the implementation details:
 
 ### Architecture & Stack
 - **Target Runtime**: .NET 8 LTS (`net8.0-windows`), Win-x64 standalone single-file binary.
 - **UI Framework**: WPF (Windows Presentation Foundation) styled to match Windows 11 Fluent dark mode.
 - **Resource Footprint**: ~25 MB RAM, 0% CPU at idle.
 
+### HDMI-CEC Engine & Closed-Loop Volume Controller
+- **Strict Unicast Addressing**: All CEC opcodes (`<Standby> 0x36`, `<Give Device Power Status> 0x8F`, `<Give Audio Status> 0x71`, `<System Audio Mode Request> 0x70`, and `<User Control Pressed/Released> 0x44/0x45`) are strictly unicast to Logical Address `5` (`CECDEVICE_AUDIOSYSTEM`). BarControl never broadcasts to address `15` or TV address `0`, ensuring your primary monitor never flickers or switches inputs.
+- **Synchronous Sleep & Shutdown Standby**: Hooks `SystemEvents.PowerModeChanged` (`PowerModes.Suspend` / `PowerModes.Resume`), `SystemEvents.SessionEnding`, and WPF `Application.OnSessionEnding` to transmit discrete idempotent standby opcodes (`0x36` + `0x6C`) synchronously before Windows suspends user-mode threads or terminates the session, and automatically re-enumerates the USB-CEC COM port on wake.
+- **Closed-Loop Target-Chasing Volume (`CecVolumeController`)**: Uses a non-blocking background worker that sends explicit keypress/release bursts toward the requested volume slider target and verifies actual hardware volume via `<Report Audio Status> (0x7A)`.
+
+### Dolby Atmos / Bitstream Volume Proxy
+- **Exclusive Bitstream Detection**: Monitors WASAPI session states and endpoint volume lock conditions on the selected soundbar endpoint while continuously snapshotting user PCM volume levels (`SavedWindowsVolume` and `SavedSoundbarVolume`).
+- **Two-Way Keyboard Hook & Endpoint Bridge**: Uses a low-level keyboard hook (`WH_KEYBOARD_LL` for `VK_VOLUME_UP`, `VK_VOLUME_DOWN`, `VK_VOLUME_MUTE`) combined with `IAudioEndpointVolumeCallback` notifications to intercept volume adjustments during exclusive bitstream playback and dispatch them to `CecVolumeController`, restoring pre-stream volumes when returning to shared PCM.
+
 ### Win32 Relocation Engine
-- **Event Hooks**: Uses native `SetWinEventHook` to listen out-of-context for:
-  - `EVENT_OBJECT_LOCATIONCHANGE`: Catches keyboard-driven moves (such as `Win + Shift + Arrow`) immediately without polling.
-  - `EVENT_SYSTEM_MOVESIZEEND`: Catches mouse drag-and-drop operations the moment a window is released.
-  - `EVENT_OBJECT_SHOW`: Catches newly created windows launching directly onto a blocked screen.
-  - `EVENT_SYSTEM_FOREGROUND`: Ensures newly focused windows are on allowed screens.
-- **Fallback Sweep**: A lightweight background timer periodically checks all top-level windows to catch any unhooked background processes.
-- **Hardware Plug/Unplug Detection**: Hooks `WM_DISPLAYCHANGE` window messages. When a soundbar powers on/off, wakes from sleep, or a cable is reconnected, BarControl automatically re-enumerates displays and updates its layout without needing a restart.
-- **Display Friendly Names**: Reads monitor model names (e.g., `AW3423DWF`, `SOUNDSLAYER`) directly via WMI (`WmiMonitorID` EDID parsing) rather than generic `\\.\DISPLAY#` strings.
-- **Display Protection Guard**: Uses `Win32.MonitorFromWindow` to prevent designating an off-limits or invisible screen as primary.
-- **DWM Redraw Cleanliness**: Dispatches `Win32.RedrawWindow` with `RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW` after repositioning to prevent DirectX / hardware composition tearing.
+- **Event Hooks**: Uses native `SetWinEventHook` out-of-context for `EVENT_OBJECT_LOCATIONCHANGE`, `EVENT_SYSTEM_MOVESIZEEND`, `EVENT_OBJECT_SHOW`, and `EVENT_SYSTEM_FOREGROUND`, paired with a lightweight fallback sweep and `WM_DISPLAYCHANGE` hot-plug detection.
+- **Display Friendly Names**: Reads monitor model names (e.g., `AW3423DWF`, `SOUNDSLAYER`) directly via WMI (`WmiMonitorID` EDID parsing).
+- **Primary Monitor Safety Guard**: Automatically prevents the OS Primary display from ever being marked as excluded.
 
 ### Audio Keep-Alive (WASAPI Engine)
-- **Problem Solved**: Digital soundbars (e.g. Panasonic SoundSlayer), AV receivers, and DACs often enter a power-saving sleep state when silent. When audio starts playing, the first 1-2 seconds get clipped or delayed while the HDMI audio clock re-syncs.
-- **Per-Device Targeting**: Rather than keeping all audio devices awake or waking headphones when you don't want them, BarControl correlates connected HDMI/DisplayPort audio endpoints with their specific physical displays. If a monitor has an associated soundbar or audio output, a dedicated **Keep Audio Alive** option appears directly on that display card (default: ON). Displays without audio outputs keep this option cleanly hidden.
-- **Power-State Aware**: When you turn off your soundbar, BarControl stops streaming to it and waits for it without ever keeping alive whatever other audio output you might be using (such as headphones or desktop speakers). When the soundbar is powered back on, BarControl resumes keeping it awake automatically.
-- **Implementation**: Uses native Windows Audio Session API (`IAudioClient`) in shared mode targeted specifically to the endpoint to stream inaudible keep-alive samples (`Fluctuate` mode) with ~0% CPU. A minimal non-zero sample is emitted at 50Hz (every `sampleRate/50` frames), alternating polarity to maintain zero DC bias. The sample size is chosen from the endpoint's real hardware output format (`PKEY_AudioEngine_DeviceFormat`): `0x38000100` (1/32767) for 16-bit outputs, `0x34000001` (1/8388607) otherwise, so the pulse is not rounded away to digital silence.
+- **Per-Device & Power-State Aware**: Targets only the selected soundbar's WASAPI endpoint in shared mode (`IAudioClient`) using a 50Hz zero-DC-bias sub-bit `Fluctuate` pulse (`0x38000100` for 16-bit, `0x34000001` for 24/32-bit), automatically pausing when the soundbar is powered off so headphones or desktop speakers are unaffected.
 - **Acknowledgements & Credit**: The audio keep-alive feature and `Fluctuate` stream implementation are directly inspired by and based on the work of **VEG** in [SoundKeeper](https://github.com/vrubleg/soundkeeper).
 
 ### Build & Utility Scripts
@@ -117,9 +121,8 @@ For anyone interested in the implementation details:
 | `run.cmd` | Runs the app from source (`dotnet run`). |
 | `build.cmd` | Builds the solution in Release mode (`dotnet build`). |
 | `publish.cmd` | Builds the self-contained single-file executable to `dist\BarControl.exe`. |
-| `install.cmd` | Builds and installs BarControl to user profile with Start Menu shortcut. |
+| `install.cmd` | Installs BarControl to `%LocalAppData%\Programs\BarControl`, Start Menu, and Windows Installed Apps. |
 | `uninstall.cmd` | Cleanly removes BarControl, shortcuts, and registry entries. |
-| `installer.iss` | Inno Setup script for building a standard Windows setup wizard installer. |
 
 ### Repository Structure
 ```
