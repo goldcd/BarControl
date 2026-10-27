@@ -4,9 +4,11 @@ on:
   push:
     tags:
       - 'v*'
-  release:
-    types: [published]
   workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -53,18 +55,10 @@ jobs:
         $versionArg = if ('${{ steps.version.outputs.value }}') { '-p:Version=${{ steps.version.outputs.value }}' } else { '' }
         dotnet publish BarControl.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true $versionArg -o dist/
 
-    - name: Build Inno Setup Installer
-      shell: pwsh
-      run: |
-        $ver = if ('${{ steps.version.outputs.value }}') { '${{ steps.version.outputs.value }}' } else { '0.1.0' }
-        iscc /DMyAppVersion="$ver" /F"BarControl-Setup" installer.iss
-
     - name: Create or Update GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          dist/BarControl.exe
-          dist/BarControl-Setup.exe
+        files: dist/BarControl.exe
         tag_name: ${{ steps.version.outputs.tag }}
         name: BarControl ${{ steps.version.outputs.tag }}
         draft: false
