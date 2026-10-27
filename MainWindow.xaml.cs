@@ -17,6 +17,15 @@ public partial class MainWindow : Window
         InitializeComponent();
         ViewModel = viewModel;
         DataContext = ViewModel;
+
+        StateChanged += (s, e) =>
+        {
+            ViewModel.IsUiActive = (WindowState != WindowState.Minimized && IsVisible);
+        };
+        IsVisibleChanged += (s, e) =>
+        {
+            ViewModel.IsUiActive = (WindowState != WindowState.Minimized && IsVisible);
+        };
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -128,5 +137,25 @@ public partial class MainWindow : Window
     private async void OnTogglePowerClicked(object sender, RoutedEventArgs e)
     {
         await ViewModel.TogglePowerSoundbarAsync();
+    }
+
+    private void OnVolumeSliderDragStarted(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        ViewModel.OnSliderDragStarted();
+    }
+
+    private async void OnVolumeSliderDragEnded(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        await ViewModel.OnSliderDragEndedAsync();
+    }
+
+    private async void OnVolumeUpClicked(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.StepVolumeUpAsync();
+    }
+
+    private async void OnVolumeDownClicked(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.StepVolumeDownAsync();
     }
 }

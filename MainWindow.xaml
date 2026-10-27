@@ -232,6 +232,54 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Custom Fluent Volume Slider Style -->
+        <Style x:Key="FluentVolumeSliderStyle" TargetType="Slider">
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Background="#34D399" Height="4" CornerRadius="2,0,0,2"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Background="#2C2C34" Height="4" CornerRadius="0,2,2,0"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb x:Name="Thumb">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Width="14" Height="14" Fill="#34D399" Stroke="#FFFFFF" StrokeThickness="1.5"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="20,16,20,16">
@@ -254,50 +302,8 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: App Icon & Brand -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Icon -->
-                    <Border Width="26" Height="26" Margin="0,0,10,0" Background="#0078D4" CornerRadius="6" VerticalAlignment="Center">
-                        <TextBlock Text="🔊" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
-                        <TextBlock Text="BarControl" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                        <TextBlock Text="— Soundbar &amp; CEC" FontSize="13" FontWeight="SemiBold" Foreground="#8E8E98" VerticalAlignment="Center" Margin="6,2,0,0"/>
-                    </StackPanel>
-
-                    <!-- Guard Status Button -->
-                    <Button Click="OnToggleGuardClicked"
-                            Cursor="Hand"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Padding="0"
-                            ToolTip="Click to toggle BarControl Guard On/Off">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="pillBorder"
-                                        Background="{Binding StatusBrush, FallbackValue=#164E3D}"
-                                        CornerRadius="12"
-                                        Padding="10,4"
-                                        VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Ellipse Width="6" Height="6" Fill="White" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding StatusText, FallbackValue='GUARD ACTIVE'}"
-                                                   FontSize="10.5"
-                                                   FontWeight="Bold"
-                                                   Foreground="White"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="pillBorder" Property="Opacity" Value="0.85"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-                </StackPanel>
+                <!-- Left: App Brand Title -->
+                <TextBlock Grid.Column="0" Text="Bar Control" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
 
                 <!-- Right: Options -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -389,33 +395,78 @@
                             <TextBlock Text="HDMI-CEC Power Management" FontSize="14.5" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                         </StackPanel>
 
-                        <!-- Hardware / Connection Details Bar -->
-                        <Border Background="#17171A" CornerRadius="6" Padding="12,7" Margin="0,0,0,12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+                        <!-- Hardware / Connection Details Bar with Interactive Volume Slider -->
+                        <Border Background="#17171A" CornerRadius="6" Padding="12,9" Margin="0,0,0,12">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="Adapter:" FontSize="11.5" Foreground="#71717A" Margin="0,0,4,0"/>
-                                    <TextBlock Text="Pulse-Eight USB-CEC" FontSize="11.5" FontWeight="SemiBold" Foreground="#EDEDED" Margin="0,0,6,0"/>
-                                    <TextBlock Text="(" FontSize="11.5" Foreground="#71717A"/>
-                                    <TextBlock Text="{Binding CecPortName}" FontSize="11.5" Foreground="#A1A1AA"/>
-                                    <TextBlock Text=")" FontSize="11.5" Foreground="#71717A" Margin="0,0,10,0"/>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="Adapter:" FontSize="11.5" Foreground="#71717A" Margin="0,0,4,0"/>
+                                        <TextBlock Text="Pulse-Eight USB-CEC" FontSize="11.5" FontWeight="SemiBold" Foreground="#EDEDED" Margin="0,0,6,0"/>
+                                        <TextBlock Text="(" FontSize="11.5" Foreground="#71717A"/>
+                                        <TextBlock Text="{Binding CecPortName}" FontSize="11.5" Foreground="#A1A1AA"/>
+                                        <TextBlock Text=")" FontSize="11.5" Foreground="#71717A" Margin="0,0,10,0"/>
 
-                                    <TextBlock Text="• Device:" FontSize="11.5" Foreground="#71717A" Margin="0,0,4,0"/>
-                                    <TextBlock Text="{Binding SoundbarVendor}" FontSize="11.5" Foreground="#A1A1AA" Margin="0,0,4,0"/>
-                                    <TextBlock Text="{Binding SoundbarCecName}" FontSize="11.5" FontWeight="SemiBold" Foreground="#EDEDED"/>
-                                </StackPanel>
+                                        <TextBlock Text="• Device:" FontSize="11.5" Foreground="#71717A" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding SoundbarVendor}" FontSize="11.5" Foreground="#A1A1AA" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding SoundbarCecName}" FontSize="11.5" FontWeight="SemiBold" Foreground="#EDEDED"/>
+                                    </StackPanel>
 
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding CecVolumeText}"
-                                           FontSize="11.5"
-                                           FontWeight="SemiBold"
-                                           Foreground="#34D399"
-                                           VerticalAlignment="Center"/>
-                            </Grid>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding CecVolumeText}"
+                                               FontSize="11.5"
+                                               FontWeight="SemiBold"
+                                               Foreground="#34D399"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Interactive Volume Slider Bar -->
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button Grid.Column="0"
+                                            Content="🔉"
+                                            Style="{StaticResource ActionButtonStyle}"
+                                            Padding="6,1"
+                                            FontSize="10"
+                                            Height="22"
+                                            Margin="0,0,8,0"
+                                            Click="OnVolumeDownClicked"
+                                            ToolTip="Step volume down"/>
+
+                                    <Slider Grid.Column="1"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            SmallChange="1"
+                                            LargeChange="5"
+                                            Value="{Binding CecVolumeSliderValue, Mode=TwoWay}"
+                                            IsEnabled="{Binding CanControlVolume}"
+                                            Style="{StaticResource FluentVolumeSliderStyle}"
+                                            PreviewMouseDown="OnVolumeSliderDragStarted"
+                                            PreviewMouseUp="OnVolumeSliderDragEnded"
+                                            VerticalAlignment="Center"
+                                            Cursor="Hand"
+                                            ToolTip="Drag to adjust soundbar volume over HDMI-CEC"/>
+
+                                    <Button Grid.Column="2"
+                                            Content="🔊"
+                                            Style="{StaticResource ActionButtonStyle}"
+                                            Padding="6,1"
+                                            FontSize="10"
+                                            Height="22"
+                                            Margin="8,0,0,0"
+                                            Click="OnVolumeUpClicked"
+                                            ToolTip="Step volume up"/>
+                                </Grid>
+                            </StackPanel>
                         </Border>
 
                         <!-- Checkbox Option 1: Standby & Wake Sync -->

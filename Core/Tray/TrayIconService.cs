@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -11,13 +11,9 @@ public class TrayIconService : IDisposable
 {
     private readonly NotifyIcon _notifyIcon;
     private readonly ContextMenuStrip _contextMenu;
-    private readonly ToolStripMenuItem _guardToggleItem;
     private bool _isDisposed;
 
     public event Action? OnOpenRequested;
-    public event Action<bool>? OnGuardToggled;
-    public event Action? OnIdentifyRequested;
-    public event Action? OnResetPrimaryRequested;
     public event Action? OnExitRequested;
 
     public TrayIconService()
@@ -30,35 +26,15 @@ public class TrayIconService : IDisposable
             Font = new Font(_contextMenu.Font ?? SystemFonts.DefaultFont, FontStyle.Bold)
         };
 
-        // 2. Toggle App On/Off option
-        _guardToggleItem = new ToolStripMenuItem("Guard: Active (Click to Toggle)", null, (s, e) =>
-        {
-            if (s is ToolStripMenuItem item)
-            {
-                bool newState = !item.Checked;
-                SetGuardState(newState);
-                OnGuardToggled?.Invoke(newState);
-            }
-        })
-        {
-            Checked = true
-        };
-
-        var identifyItem = new ToolStripMenuItem("Identify Displays", null, (s, e) => OnIdentifyRequested?.Invoke());
-        var resetItem = new ToolStripMenuItem("Reset Target to Windows Primary", null, (s, e) => OnResetPrimaryRequested?.Invoke());
         var exitItem = new ToolStripMenuItem("Exit", null, (s, e) => OnExitRequested?.Invoke());
 
         _contextMenu.Items.Add(openItem);
-        _contextMenu.Items.Add(_guardToggleItem);
-        _contextMenu.Items.Add(new ToolStripSeparator());
-        _contextMenu.Items.Add(identifyItem);
-        _contextMenu.Items.Add(resetItem);
         _contextMenu.Items.Add(new ToolStripSeparator());
         _contextMenu.Items.Add(exitItem);
 
         _notifyIcon = new NotifyIcon
         {
-            Text = "BarControl - Not on That Monitor (Active)",
+            Text = "BarControl",
             Visible = true,
             ContextMenuStrip = _contextMenu,
             Icon = CreateMonitorIcon(true)
@@ -80,10 +56,8 @@ public class TrayIconService : IDisposable
 
     public void SetGuardState(bool isEnabled)
     {
-        _guardToggleItem.Checked = isEnabled;
-        _guardToggleItem.Text = isEnabled ? "Guard: Active (Click to Pause)" : "Guard: Paused (Click to Enable)";
         UpdateIconState(isEnabled);
-        _notifyIcon.Text = isEnabled ? "BarControl - Not on That Monitor (Active)" : "BarControl - Not on That Monitor (Paused)";
+        _notifyIcon.Text = "BarControl";
     }
 
     private void UpdateIconState(bool active)
@@ -95,11 +69,7 @@ public class TrayIconService : IDisposable
 
     public void ShowRelocationNotification(RelocationLogItem item)
     {
-        _notifyIcon.ShowBalloonTip(
-            2500,
-            "BarControl: Window Relocated",
-            $"Moved \"{item.ProcessName}\" from {item.SourceMonitor} to {item.TargetMonitor}",
-            ToolTipIcon.Info);
+        // Suppressed per user request: no balloon notifications on window relocation
     }
 
     private static Icon CreateMonitorIcon(bool withForbiddenOverlay)

@@ -334,9 +334,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
         UpdateGuardStatusVisuals();
 
         _engine.OnWindowRelocated += HandleWindowRelocated;
-        _trayService.OnGuardToggled += (enabled) => IsGuardActive = enabled;
-        _trayService.OnIdentifyRequested += () => IdentifyAllDisplays();
-        _trayService.OnResetPrimaryRequested += () => ResetToWindowsPrimary();
 
         LoadDisplays();
 
@@ -586,11 +583,72 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     public bool CanOperatePower => !IsOperatingPower;
 
+    public bool IsUiActive
+    {
+        get => _cecService?.IsUiActive ?? true;
+        set
+        {
+            if (_cecService != null)
+            {
+                _cecService.IsUiActive = value;
+            }
+        }
+    }
+
+    public bool CanControlVolume => IsCecConnected && _cecService?.PowerStatus == LibCec.CEC_POWER_STATUS_ON;
+
+    private int _sliderVolumePercent;
+    private bool _isUserDraggingSlider;
+
+    public int CecVolumeSliderValue
+    {
+        get => _sliderVolumePercent;
+        set
+        {
+            if (_sliderVolumePercent != value)
+            {
+                _sliderVolumePercent = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public void OnSliderDragStarted()
+    {
+        _isUserDraggingSlider = true;
+    }
+
+    public async Task OnSliderDragEndedAsync()
+    {
+        _isUserDraggingSlider = false;
+        if (_cecService != null && CanControlVolume)
+        {
+            await _cecService.SetVolumeTargetAsync(_sliderVolumePercent);
+        }
+    }
+
+    public async Task StepVolumeUpAsync()
+    {
+        if (_cecService != null && CanControlVolume)
+        {
+            await _cecService.StepVolumeAsync(true);
+        }
+    }
+
+    public async Task StepVolumeDownAsync()
+    {
+        if (_cecService != null && CanControlVolume)
+        {
+            await _cecService.StepVolumeAsync(false);
+        }
+    }
+
     public void NotifyPowerButtonState()
     {
         OnPropertyChanged(nameof(IsOperatingPower));
         OnPropertyChanged(nameof(CanOperatePower));
         OnPropertyChanged(nameof(CanTogglePower));
+        OnPropertyChanged(nameof(CanControlVolume));
         OnPropertyChanged(nameof(PowerToggleButtonText));
         OnPropertyChanged(nameof(PowerToggleButtonBackground));
         OnPropertyChanged(nameof(PowerToggleButtonBorderBrush));
@@ -598,6 +656,15 @@ public class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CecPowerStatusText));
         OnPropertyChanged(nameof(CecPowerStatusBrush));
         OnPropertyChanged(nameof(CecVolumeText));
+
+        if (!_isUserDraggingSlider && _cecService != null)
+        {
+            int vol = _cecService.AudioStatus.VolumePercent;
+            if (vol >= 0 && vol <= 100)
+            {
+                CecVolumeSliderValue = vol;
+            }
+        }
     }
 
     public async Task TogglePowerSoundbarAsync()

@@ -30,6 +30,7 @@ public class CecService : IDisposable
     public CecAudioStatus AudioStatus { get; private set; } = new(false, 0);
 
     public bool AutoPowerSyncEnabled { get; set; } = true;
+    public volatile bool IsUiActive = true;
 
     public event Action? StateChanged;
 
@@ -221,7 +222,9 @@ public class CecService : IDisposable
             {
                 try
                 {
-                    await Task.Delay(2000, token);
+                    // Fast responsive polling (500ms) when UI is active; throttled (5000ms) when minimized/hidden
+                    int pollDelay = IsUiActive ? 500 : 5000;
+                    await Task.Delay(pollDelay, token);
                     if (token.IsCancellationRequested) break;
 
                     lock (_lock)
@@ -250,6 +253,55 @@ public class CecService : IDisposable
                 }
             }
         }, token);
+    }
+
+    public async Task<int> StepVolumeAsync(bool up)
+    {
+        return await Task.Run(() =>
+        {
+            lock (_lock)
+            {
+                if (_conn == IntPtr.Zero || !IsConnected) return -1;
+                int code = up ? LibCec.CEC_USER_CONTROL_CODE_VOLUME_UP : LibCec.CEC_USER_CONTROL_CODE_VOLUME_DOWN;
+                LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, code, 1);
+                LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
+                Thread.Sleep(80);
+                RefreshDeviceInfoInternal();
+                StateChanged?.Invoke();
+                return AudioStatus.VolumePercent;
+            }
+        });
+    }
+
+    public async Task SetVolumeTargetAsync(int targetPercent)
+    {
+        await Task.Run(() =>
+        {
+            lock (_lock)
+            {
+                if (_conn == IntPtr.Zero || !IsConnected) return;
+
+                int current = AudioStatus.VolumePercent;
+                int diff = targetPercent - current;
+                if (diff == 0) return;
+
+                int steps = Math.Abs(diff);
+                // Cap to max 15 steps per drag to avoid CEC bus saturation
+                steps = Math.Min(steps, 15);
+                int code = diff > 0 ? LibCec.CEC_USER_CONTROL_CODE_VOLUME_UP : LibCec.CEC_USER_CONTROL_CODE_VOLUME_DOWN;
+
+                for (int i = 0; i < steps; i++)
+                {
+                    LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, code, 1);
+                    LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
+                    Thread.Sleep(30);
+                }
+
+                Thread.Sleep(100);
+                RefreshDeviceInfoInternal();
+                StateChanged?.Invoke();
+            }
+        });
     }
 
     public async Task<bool> PowerOnSoundbarAsync()

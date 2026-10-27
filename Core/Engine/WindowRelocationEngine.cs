@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -394,9 +394,9 @@ public class WindowRelocationEngine : IDisposable
         if (sourceExcludedMonitor == null)
         {
             bool isCurrentZoomed = Win32.IsZoomed(hWnd);
-            if (!isCurrentZoomed && rect.Width >= 100 && rect.Height >= 100)
+            if (!isCurrentZoomed && Win32.GetWindowRect(hWnd, out var safeWinRect) && safeWinRect.Width >= 100 && safeWinRect.Height >= 100)
             {
-                _lastKnownSafeBounds[hWnd] = rect;
+                _lastKnownSafeBounds[hWnd] = safeWinRect;
                 _lastKnownMaximized[hWnd] = false;
             }
             else if (isCurrentZoomed)
@@ -432,7 +432,12 @@ public class WindowRelocationEngine : IDisposable
         bool hadSavedBounds = _lastKnownSafeBounds.TryGetValue(hWnd, out var savedRect);
         bool wasMaximized = (_lastKnownMaximized.TryGetValue(hWnd, out var wasMax) && wasMax) || isZoomed;
 
+        Win32.GetWindowRect(hWnd, out var curWinRect);
+        int curWidth = curWinRect.Width;
+        int curHeight = curWinRect.Height;
+
         int targetWidth, targetHeight, targetX, targetY;
+        bool resizeNeeded = false;
 
         if (hadSavedBounds && savedRect.Width >= 100 && savedRect.Height >= 100)
         {
@@ -441,14 +446,22 @@ public class WindowRelocationEngine : IDisposable
             targetHeight = Math.Min(savedRect.Height, targetPrimary.WorkHeight);
             targetX = Math.Max(targetPrimary.WorkLeft, Math.Min(savedRect.Left, targetPrimary.WorkRight - targetWidth));
             targetY = Math.Max(targetPrimary.WorkTop, Math.Min(savedRect.Top, targetPrimary.WorkBottom - targetHeight));
+            resizeNeeded = (targetWidth != curWidth || targetHeight != curHeight);
         }
         else
         {
             // Fallback for new window launching directly onto excluded monitor:
-            targetWidth = Math.Max(320, Math.Min(rect.Width, targetPrimary.WorkWidth));
-            targetHeight = Math.Max(240, Math.Min(rect.Height, targetPrimary.WorkHeight));
+            targetWidth = Math.Min(curWidth > 0 ? curWidth : rect.Width, targetPrimary.WorkWidth);
+            targetHeight = Math.Min(curHeight > 0 ? curHeight : rect.Height, targetPrimary.WorkHeight);
             targetX = targetPrimary.WorkLeft + Math.Max(0, (targetPrimary.WorkWidth - targetWidth) / 2);
             targetY = targetPrimary.WorkTop + Math.Max(0, (targetPrimary.WorkHeight - targetHeight) / 2);
+            resizeNeeded = (targetWidth != curWidth || targetHeight != curHeight);
+        }
+
+        uint swpFlags = Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE | Win32.SWP_FRAMECHANGED | Win32.SWP_SHOWWINDOW;
+        if (!resizeNeeded)
+        {
+            swpFlags |= Win32.SWP_NOSIZE;
         }
 
         if (wasMaximized)
@@ -462,7 +475,7 @@ public class WindowRelocationEngine : IDisposable
                 targetY,
                 targetWidth,
                 targetHeight,
-                Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE | Win32.SWP_FRAMECHANGED | Win32.SWP_SHOWWINDOW);
+                swpFlags);
 
             Win32.ShowWindow(hWnd, Win32.SW_MAXIMIZE);
             Win32.RedrawWindow(
@@ -480,7 +493,7 @@ public class WindowRelocationEngine : IDisposable
                 targetY,
                 targetWidth,
                 targetHeight,
-                Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE | Win32.SWP_FRAMECHANGED | Win32.SWP_SHOWWINDOW);
+                swpFlags);
 
             Win32.RedrawWindow(
                 hWnd,
