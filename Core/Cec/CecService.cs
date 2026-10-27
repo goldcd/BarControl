@@ -159,11 +159,18 @@ public class CecService : IDisposable
                 LibCec.CEC_OPCODE_GIVE_DEVICE_POWER_STATUS);
             LibCec.libcec_transmit(_conn, ref pwrCmd);
 
-            Thread.Sleep(200);
+            Thread.Sleep(120);
             int pwr = LibCec.libcec_get_device_power_status(_conn, TargetLogicalAddress);
             PowerStatus = pwr;
 
-            // 2. Query audio status
+            // 2. Query audio status directly from the wire (0x71) strictly to TargetLogicalAddress
+            var audioCmd = CecCommand.Create(
+                LibCec.CECDEVICE_RECORDINGDEVICE1,
+                TargetLogicalAddress,
+                LibCec.CEC_OPCODE_GIVE_AUDIO_STATUS);
+            LibCec.libcec_transmit(_conn, ref audioCmd);
+
+            Thread.Sleep(120);
             byte rawAudio = LibCec.libcec_audio_get_status(_conn);
             bool isMuted = (rawAudio & 0x80) != 0;
             int vol = rawAudio & 0x7F;
@@ -195,8 +202,6 @@ public class CecService : IDisposable
                     SoundbarVendor = vendor;
                 }
             }
-
-            LogService.LogInfo($"CEC: Status updated for device {TargetLogicalAddress}. Power={PowerStatus}, Vol={vol}%, Muted={isMuted}, Vendor={SoundbarVendor}, Name={SoundbarName}");
         }
         catch (Exception ex)
         {
@@ -216,7 +221,7 @@ public class CecService : IDisposable
             {
                 try
                 {
-                    await Task.Delay(3500, token);
+                    await Task.Delay(2000, token);
                     if (token.IsCancellationRequested) break;
 
                     lock (_lock)
@@ -230,6 +235,7 @@ public class CecService : IDisposable
 
                         if (PowerStatus != oldPower || AudioStatus != oldAudio)
                         {
+                            LogService.LogInfo($"CEC: Live state updated: Power={PowerStatus}, Vol={AudioStatus.VolumePercent}%, Muted={AudioStatus.IsMuted}");
                             StateChanged?.Invoke();
                         }
                     }

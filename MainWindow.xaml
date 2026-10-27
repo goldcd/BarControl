@@ -384,29 +384,10 @@
                         Margin="0,0,0,12">
                     <StackPanel>
                         <!-- Card Header -->
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="⚡" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="HDMI-CEC Power Management" FontSize="14.5" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                            </StackPanel>
-
-                            <!-- Live Power Status Badge -->
-                            <Border Grid.Column="1"
-                                    Background="{Binding CecPowerStatusBrush}"
-                                    CornerRadius="10"
-                                    Padding="10,3"
-                                    VerticalAlignment="Center">
-                                <TextBlock Text="{Binding CecPowerStatusText}"
-                                           FontSize="10.5"
-                                           FontWeight="Bold"
-                                           Foreground="White"/>
-                            </Border>
-                        </Grid>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,10">
+                            <TextBlock Text="⚡" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="HDMI-CEC Power Management" FontSize="14.5" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                        </StackPanel>
 
                         <!-- Hardware / Connection Details Bar -->
                         <Border Background="#17171A" CornerRadius="6" Padding="12,7" Margin="0,0,0,12">
@@ -458,36 +439,18 @@
                             </Grid>
                         </Border>
 
-                        <!-- Manual Power Control Buttons -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <Button Grid.Column="0"
-                                    Content="⚡ Power On"
-                                    Style="{StaticResource PrimaryButtonStyle}"
-                                    IsEnabled="{Binding CanOperatePower}"
-                                    Click="OnPowerOnClicked"
-                                    ToolTip="Send CEC power on sequence to soundbar now"/>
-
-                            <Button Grid.Column="2"
-                                    Content="🌙 Standby (Off)"
-                                    Style="{StaticResource AmberButtonStyle}"
-                                    IsEnabled="{Binding CanOperatePower}"
-                                    Click="OnStandbyClicked"
-                                    ToolTip="Send CEC standby command to soundbar now"/>
-
-                            <Button Grid.Column="4"
-                                    Content="🔄 Refresh Status"
-                                    Style="{StaticResource ActionButtonStyle}"
-                                    Click="OnRefreshCecClicked"
-                                    ToolTip="Poll soundbar power and volume status over CEC"/>
-                        </Grid>
+                        <!-- Manual Power Toggle Button -->
+                        <Button Content="{Binding PowerToggleButtonText}"
+                                Background="{Binding PowerToggleButtonBackground}"
+                                BorderBrush="{Binding PowerToggleButtonBorderBrush}"
+                                Foreground="{Binding PowerToggleButtonForeground}"
+                                IsEnabled="{Binding CanTogglePower}"
+                                Style="{StaticResource ActionButtonStyle}"
+                                Height="36"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Click="OnTogglePowerClicked"
+                                ToolTip="Toggle soundbar power state via HDMI-CEC"/>
                     </StackPanel>
                 </Border>
 

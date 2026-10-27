@@ -125,18 +125,8 @@ public partial class MainWindow : Window
         await ViewModel.ApplyUpdateAsync();
     }
 
-    private async void OnPowerOnClicked(object sender, RoutedEventArgs e)
+    private async void OnTogglePowerClicked(object sender, RoutedEventArgs e)
     {
-        await ViewModel.PowerOnSoundbarAsync();
-    }
-
-    private async void OnStandbyClicked(object sender, RoutedEventArgs e)
-    {
-        await ViewModel.StandbySoundbarAsync();
-    }
-
-    private async void OnRefreshCecClicked(object sender, RoutedEventArgs e)
-    {
-        await ViewModel.RefreshCecStatusAsync();
+        await ViewModel.TogglePowerSoundbarAsync();
     }
 }
