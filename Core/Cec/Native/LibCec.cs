@@ -6,6 +6,30 @@ using System.Runtime.InteropServices;
 namespace BarControl.Core.Cec.Native;
 
 [StructLayout(LayoutKind.Sequential)]
+public struct CecDatapacket
+{
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
+    public byte[] Data;
+    public byte Size;
+
+    public static CecDatapacket Create(params byte[] bytes)
+    {
+        var packet = new CecDatapacket
+        {
+            Data = new byte[64],
+            Size = (byte)(bytes?.Length ?? 0)
+        };
+        if (bytes != null && bytes.Length > 0)
+        {
+            Array.Copy(bytes, packet.Data, Math.Min(bytes.Length, 64));
+        }
+        return packet;
+    }
+
+    public static CecDatapacket Empty() => new() { Data = new byte[64], Size = 0 };
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public struct CecCommand
 {
     public int Initiator;
@@ -13,11 +37,24 @@ public struct CecCommand
     public byte Ack;
     public byte Eom;
     public int Opcode;
-    public byte ParametersSize;
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-    public byte[] Parameters;
+    public CecDatapacket Parameters;
     public byte OpcodeSet;
     public int TransmitTimeout;
+
+    public static CecCommand Create(int initiator, int destination, int opcode, CecDatapacket? parameters = null, int timeout = 2000)
+    {
+        return new CecCommand
+        {
+            Initiator = initiator,
+            Destination = destination,
+            Ack = 0,
+            Eom = 1,
+            Opcode = opcode,
+            Parameters = parameters ?? CecDatapacket.Empty(),
+            OpcodeSet = 1,
+            TransmitTimeout = timeout
+        };
+    }
 }
 
 public static class LibCec
@@ -47,6 +84,8 @@ public static class LibCec
     public const int CEC_OPCODE_STANDBY = 0x36;
     public const int CEC_OPCODE_SYSTEM_AUDIO_MODE_REQUEST = 0x70;
     public const int CEC_OPCODE_GIVE_AUDIO_STATUS = 0x71;
+    public const int CEC_OPCODE_GIVE_DEVICE_POWER_STATUS = 0x8F;
+    public const int CEC_OPCODE_REPORT_POWER_STATUS = 0x90;
 
     static LibCec()
     {
