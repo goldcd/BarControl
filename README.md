@@ -54,17 +54,23 @@ publish.cmd
 ---
 
 ### How to Use BarControl
-1. **Configure Displays**:
+1. **Select Your Soundbar / HDMI Audio Device**:
    - Open BarControl (it opens on start, or left-click its system tray icon by the clock).
-   - The UI shows your displays arranged according to their Windows Display Settings positions.
-   - Click **Identify Displays** to flash large labels onto all screens.
-   - Select your soundbar / secondary display and click **Block Display (Not in Use)**.
-   - Ensure your main monitor is marked as **Primary Target**.
-2. **Audio Keep-Alive**:
-   - For any display with an associated HDMI/DP audio endpoint (such as the SoundSlayer), the **Keep Audio Alive** card is automatically available and enabled.
-3. **Tray Controls (by the Clock)**:
+   - Select your HDMI soundbar display from the dropdown at the top.
+   - **Phantom Display Guard**: Enable to prevent windows and dialogs from getting trapped on the phantom soundbar display (your primary monitor is automatically protected).
+   - **Continuous Audio Keep-Alive**: Enable to stream an imperceptible sub-bit WASAPI signal to prevent soundbar sleep and audio startup clipping.
+2. **HDMI-CEC Power & Volume Control**:
+   - Automatically discovers your Pulse-Eight USB-CEC adapter and connected HDMI soundbar.
+   - Use the **closed-loop volume slider** (with dual target & actual hardware indicators) or `🔉` / `🔊` step buttons.
+   - Toggle **Auto-Power Sync (Sleep / Wake)** to automatically put your soundbar into standby when Windows sleeps/hibernates and wake it when Windows resumes.
+3. **Dolby Atmos / Bitstream CEC Volume Proxy**:
+   - Automatically detects when an exclusive bitstream (such as Netflix Dolby Atmos or DTS) locks the audio endpoint.
+   - Bridges your keyboard volume keys/wheel and mute controls directly to the soundbar over HDMI-CEC, and restores your previous Windows & Soundbar volume levels when the stream ends.
+4. **In-App Auto-Updater**:
+   - Automatically checks GitHub Releases for newer versions and provides a one-click **Update** button in the footer bar.
+5. **Tray Controls (by the Clock)**:
    - **Left-Click**: Instantly opens / restores the BarControl GUI.
-   - **Right-Click**: Opens the quick menu (*Open BarControl*, *Guard: Active/Paused toggle*, *Identify Displays*, *Reset Target*, and *Exit*).
+   - **Right-Click**: Opens the quick menu (*Open BarControl*, *Guard: Active/Paused toggle*, and *Exit*).
 
 To uninstall completely, run `uninstall.cmd` or uninstall from **Windows Settings > Apps > Installed Apps**.
 
@@ -114,40 +120,46 @@ For anyone interested in the implementation details:
 BarControl/
 ├── Core/
 │   ├── Audio/
-│   │   ├── AudioKeepAliveService.cs  # WASAPI background keep-alive worker
-│   │   └── Wasapi.cs                 # Native WASAPI COM interop signatures
+│   │   ├── AudioKeepAliveService.cs       # WASAPI background keep-alive worker
+│   │   ├── BitstreamVolumeProxyService.cs # Dolby Atmos / Bitstream detection & CEC volume proxy
+│   │   └── Wasapi.cs                      # Native WASAPI & IAudioEndpointVolume COM interop
+│   ├── Cec/
+│   │   ├── CecService.cs                  # Pulse-Eight USB-CEC discovery, power sync & reconnect
+│   │   ├── CecVolumeController.cs         # Closed-loop target-chasing CEC volume controller
+│   │   └── Native/LibCec.cs               # Native libcec P/Invoke bindings
 │   ├── Native/
-│   │   └── Win32.cs                  # Win32 P/Invoke APIs (SetWinEventHook, DWM, RedrawWindow)
+│   │   └── Win32.cs                       # Win32 P/Invoke APIs (SetWinEventHook, DWM, RedrawWindow)
 │   ├── Display/
-│   │   ├── DisplayInfo.cs            # Monitor geometry, DPI, and friendly name models
-│   │   └── DisplayService.cs         # Display enumeration via EnumDisplayMonitors & WMI
+│   │   ├── DisplayInfo.cs                 # Monitor geometry, DPI, and friendly name models
+│   │   └── DisplayService.cs              # Display enumeration via EnumDisplayMonitors & WMI
 │   ├── Engine/
-│   │   └── WindowRelocationEngine.cs # WinEvent hook engine, window position cache & redirection
+│   │   └── WindowRelocationEngine.cs      # WinEvent hook engine, window position cache & redirection
 │   ├── Config/
-│   │   ├── AppSettings.cs            # Settings schema
-│   │   └── ConfigService.cs          # JSON settings in %LocalAppData%\BarControl\settings.json
+│   │   ├── AppSettings.cs                 # Settings schema
+│   │   └── ConfigService.cs               # JSON settings in %LocalAppData%\BarControl\settings.json
+│   ├── Logging/
+│   │   └── LogService.cs                  # Diagnostic logger in %LocalAppData%\BarControl\barcontrol.log
 │   ├── Startup/
-│   │   └── StartupService.cs         # Windows Run registry key manager
+│   │   └── StartupService.cs              # Windows Run & Uninstall registry key manager
 │   ├── Update/
-│   │   └── UpdateService.cs          # GitHub Releases auto-update checker & file swapper
+│   │   └── UpdateService.cs               # GitHub Releases auto-update checker & file swapper
 │   └── Tray/
-│       └── TrayIconService.cs        # System tray icon & context menu management
+│       └── TrayIconService.cs             # System tray icon & context menu management
 ├── UI/
-│   ├── MainWindow.xaml / .cs         # Main dashboard replicating Windows Display Settings
-│   ├── MainWindowViewModel.cs        # MVVM ViewModel coordinating engine, state, and UI
-│   ├── MonitorVisualMap.xaml / .cs   # Scaled physical monitor layout canvas
-│   └── IdentifyOverlayWindow.xaml    # Click-through screen identification overlays
+│   ├── MainWindowViewModel.cs             # MVVM ViewModel coordinating engine, CEC, proxy, and UI
+│   └── Converters.cs                      # WPF value converters
+├── MainWindow.xaml / .cs                  # Main Fluent dark-mode dashboard
 ├── Assets/
-│   ├── app.ico                       # Multi-resolution application icon
-│   ├── generate_icon.ps1             # Icon generator script
-│   └── screenshot.png                # Application UI screenshot
-├── BarControl.sln                          # Visual Studio Solution
-├── BarControl.csproj                       # Project configuration (.NET 8 Windows)
-├── install.cmd / install.ps1         # User-level installer
-├── uninstall.cmd / uninstall.ps1     # Complete uninstaller
-├── run.cmd                           # Debug runner
-├── build.cmd                         # Release builder
-└── publish.cmd / publish.ps1         # Single-file publisher
+│   ├── app.ico                            # Multi-resolution application icon
+│   ├── generate_icon.ps1                  # Icon generator script
+│   └── screenshot.png                     # Application UI screenshot
+├── BarControl.sln                         # Visual Studio Solution
+├── BarControl.csproj                      # Project configuration (.NET 8 Windows)
+├── install.cmd / install.ps1              # User-level installer
+├── uninstall.cmd / uninstall.ps1          # Complete uninstaller
+├── run.cmd                                # Debug runner
+├── build.cmd                              # Release builder
+└── publish.cmd / publish.ps1              # Single-file publisher
 ```
 
 ## Acknowledgements

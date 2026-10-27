@@ -1,6 +1,6 @@
 Add-Type -AssemblyName System.Drawing
 
-function Create-Option4-Bitmap([int]$size) {
+function Create-Soundbar-Bitmap([int]$size) {
     $bmp = New-Object System.Drawing.Bitmap $size, $size
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
@@ -10,66 +10,69 @@ function Create-Option4-Bitmap([int]$size) {
 
     $scale = [float]$size / 128.0
 
-    # 1. Minimalist Monitor Glyph
-    $penWidth = [Math]::Max(2.0, 7.0 * $scale)
-    $monitorPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 241, 245, 249), [float]$penWidth)
-    $monitorPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $monitorPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    # 1. Upward Acoustic Soundwave Arcs (centered above the soundbar)
+    $arcCenterX = [float](64.0 * $scale)
+    $arcCenterY = [float](58.0 * $scale)
 
-    $screenBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(235, 24, 26, 32))
+    $wavePenWidth = [float][Math]::Max(1.8, 7.5 * $scale)
+    $wavePen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 52, 211, 153), $wavePenWidth)
+    $wavePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $wavePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
 
-    # Screen dimensions
-    $sx = [float](16.0 * $scale)
-    $sy = [float](20.0 * $scale)
-    $sw = [float](96.0 * $scale)
-    $sh = [float](64.0 * $scale)
-    $radius = [float][Math]::Max(1.0, 6.0 * $scale)
+    # Inner wave arc
+    $r1 = [float](22.0 * $scale)
+    $g.DrawArc($wavePen, $arcCenterX - $r1, $arcCenterY - $r1, $r1 * 2, $r1 * 2, 215, 110)
 
-    # Rounded rectangle path for screen
+    # Outer wave arc
+    $r2 = [float](38.0 * $scale)
+    $g.DrawArc($wavePen, $arcCenterX - $r2, $arcCenterY - $r2, $r2 * 2, $r2 * 2, 220, 100)
+
+    # 2. Sleek Horizontal Soundbar Enclosure (Pill / Rounded Rect)
+    $bx = [float](8.0 * $scale)
+    $by = [float](60.0 * $scale)
+    $bw = [float](112.0 * $scale)
+    $bh = [float](44.0 * $scale)
+    $radius = [float][Math]::Max(2.0, 14.0 * $scale)
+
     $path = New-Object System.Drawing.Drawing2D.GraphicsPath
-    $path.AddArc($sx, $sy, $radius * 2, $radius * 2, 180, 90)
-    $path.AddArc($sx + $sw - $radius * 2, $sy, $radius * 2, $radius * 2, 270, 90)
-    $path.AddArc($sx + $sw - $radius * 2, $sy + $sh - $radius * 2, $radius * 2, $radius * 2, 0, 90)
-    $path.AddArc($sx, $sy + $sh - $radius * 2, $radius * 2, $radius * 2, 90, 90)
+    $path.AddArc($bx, $by, $radius * 2, $radius * 2, 180, 90)
+    $path.AddArc($bx + $bw - $radius * 2, $by, $radius * 2, $radius * 2, 270, 90)
+    $path.AddArc($bx + $bw - $radius * 2, $by + $bh - $radius * 2, $radius * 2, $radius * 2, 0, 90)
+    $path.AddArc($bx, $by + $bh - $radius * 2, $radius * 2, $radius * 2, 90, 90)
     $path.CloseFigure()
 
-    $g.FillPath($screenBrush, $path)
-    $g.DrawPath($monitorPen, $path)
+    $bodyBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(245, 24, 26, 32))
+    $borderWidth = [float][Math]::Max(1.8, 7.0 * $scale)
+    $borderPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 241, 245, 249), $borderWidth)
 
-    # Stand Neck & Base
-    $neckTop = [float]($sy + $sh)
-    $neckBottom = [float](104.0 * $scale)
-    $midX = [float]($size / 2.0)
-    $g.DrawLine($monitorPen, $midX, $neckTop, $midX, $neckBottom)
+    $g.FillPath($bodyBrush, $path)
+    $g.DrawPath($borderPen, $path)
 
-    $baseLeft = [float](38.0 * $scale)
-    $baseRight = [float](90.0 * $scale)
-    $g.DrawLine($monitorPen, $baseLeft, $neckBottom, $baseRight, $neckBottom)
+    # 3. Left & Right Speaker Drivers inside Soundbar
+    $driverRadius = [float][Math]::Max(1.5, 8.5 * $scale)
+    $driverY = [float]($by + ($bh / 2.0) - $driverRadius)
+    $leftDriverX = [float](28.0 * $scale - $driverRadius)
+    $rightDriverX = [float](100.0 * $scale - $driverRadius)
 
-    # 2. Option 4: Bold Diagonal Ban Stripe across monitor (bottom-left to top-right)
-    $x1 = [float](12.0 * $scale)
-    $y1 = [float](98.0 * $scale)
-    $x2 = [float](116.0 * $scale)
-    $y2 = [float](16.0 * $scale)
+    $driverBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 241, 245, 249))
+    $g.FillEllipse($driverBrush, $leftDriverX, $driverY, $driverRadius * 2, $driverRadius * 2)
+    $g.FillEllipse($driverBrush, $rightDriverX, $driverY, $driverRadius * 2, $driverRadius * 2)
 
-    # Dark contrast halo so the ban pops over white frame and dark/light backgrounds
-    $haloWidth = [float][Math]::Max(4.0, 22.0 * $scale)
-    $haloPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(230, 15, 17, 23), [float]$haloWidth)
-    $haloPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $haloPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $g.DrawLine($haloPen, $x1, $y1, $x2, $y2)
+    # 4. Center Status Bar / Grille Accent (only drawn at >= 24px so 16px stays ultra-crisp)
+    if ($size -ge 24) {
+        $grillePenWidth = [float][Math]::Max(1.5, 5.5 * $scale)
+        $grillePen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 52, 211, 153), $grillePenWidth)
+        $grillePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $grillePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $midY = [float]($by + ($bh / 2.0))
+        $g.DrawLine($grillePen, [float](52.0 * $scale), $midY, [float](76.0 * $scale), $midY)
+        $grillePen.Dispose()
+    }
 
-    # Vivid Crimson Red Stripe
-    $redWidth = [float][Math]::Max(2.5, 14.0 * $scale)
-    $redPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 239, 68, 68), [float]$redWidth)
-    $redPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $redPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $g.DrawLine($redPen, $x1, $y1, $x2, $y2)
-
-    $monitorPen.Dispose()
-    $screenBrush.Dispose()
-    $haloPen.Dispose()
-    $redPen.Dispose()
+    $wavePen.Dispose()
+    $bodyBrush.Dispose()
+    $borderPen.Dispose()
+    $driverBrush.Dispose()
     $path.Dispose()
     $g.Dispose()
 
@@ -77,7 +80,7 @@ function Create-Option4-Bitmap([int]$size) {
 }
 
 # Generate 128x128 preview PNG
-$previewBmp = Create-Option4-Bitmap 128
+$previewBmp = Create-Soundbar-Bitmap 128
 $previewBmp.Save("Assets\icon_preview_opt4.png", [System.Drawing.Imaging.ImageFormat]::Png)
 $previewBmp.Dispose()
 
@@ -93,7 +96,7 @@ $bw.Write([uint16]$sizes.Count)
 
 $pngStreams = @()
 foreach ($sz in $sizes) {
-    $bmp = Create-Option4-Bitmap $sz
+    $bmp = Create-Soundbar-Bitmap $sz
     $pngStream = New-Object System.IO.MemoryStream
     $bmp.Save($pngStream, [System.Drawing.Imaging.ImageFormat]::Png)
     $bmp.Dispose()
@@ -131,4 +134,4 @@ $bw.Flush()
 $bw.Dispose()
 $ms.Dispose()
 
-Write-Output "Successfully generated Option 4 Assets\app.ico and Assets\icon_preview_opt4.png"
+Write-Output "Successfully generated Soundbar Assets\app.ico and Assets\icon_preview_opt4.png"

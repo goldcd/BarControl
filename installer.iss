@@ -1,14 +1,14 @@
-﻿; Inno Setup Script for BarControl (Not on That Monitor)
+; Inno Setup Script for BarControl (Soundbar & HDMI-CEC Control)
 ; Builds a standard Windows Setup Wizard (e.g. BarControl-Setup.exe)
 
 #define MyAppName "BarControl"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "0.1.0"
 #define MyAppPublisher "goldcd"
 #define MyAppURL "https://github.com/goldcd/BarControl"
 #define MyAppExeName "BarControl.exe"
 
 [Setup]
-AppId={{7E8B1A2C-9F3D-4A5B-8C6E-2D4E6F8A0B1C}
+AppId={{9A4D2F6E-3B1C-4E8A-B72D-5C9F1A8E3D4B}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}

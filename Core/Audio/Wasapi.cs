@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 
 namespace BarControl.Core.Audio;
@@ -29,8 +29,13 @@ public static class Wasapi
     public const int CLSCTX_INPROC_SERVER = 1;
     public const int CLSCTX_ALL = 23;
 
+    public const int AUDCLNT_E_DEVICE_INVALIDATED = unchecked((int)0x88890004);
+    public const int AUDCLNT_E_DEVICE_IN_USE = unchecked((int)0x8889000A);
+    public const int AUDCLNT_E_EXCLUSIVE_MODE_ONLY = unchecked((int)0x8889000E);
+
     public static readonly Guid IID_IAudioClient = new("1CB9AD4C-DBFA-4c32-B178-C2F568A703B2");
     public static readonly Guid IID_IAudioRenderClient = new("F294ACFC-3146-4483-A7BF-ADDCA7C260E2");
+    public static readonly Guid IID_IAudioEndpointVolume = new("5CDF2C82-841E-4546-9722-0CF74078229A");
 
     [ComImport]
     [Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
@@ -169,6 +174,42 @@ public static class Wasapi
     {
         [PreserveSig] int GetBuffer(uint numFramesRequested, out IntPtr ppData);
         [PreserveSig] int ReleaseBuffer(uint numFramesWritten, int dwFlags);
+    }
+
+    [Guid("5CDF2C82-841E-4546-9722-0CF74078229A")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IAudioEndpointVolume
+    {
+        [PreserveSig] int RegisterControlChangeNotify(IAudioEndpointVolumeCallback pNotify);
+        [PreserveSig] int UnregisterControlChangeNotify(IAudioEndpointVolumeCallback pNotify);
+        [PreserveSig] int GetChannelCount(out uint pnChannelCount);
+        [PreserveSig] int SetMasterVolumeLevel(float fLevelDB, ref Guid pguidEventContext);
+        [PreserveSig] int SetMasterVolumeLevelScalar(float fLevel, ref Guid pguidEventContext);
+        [PreserveSig] int GetMasterVolumeLevel(out float pfLevelDB);
+        [PreserveSig] int GetMasterVolumeLevelScalar(out float pfLevel);
+        [PreserveSig] int SetChannelVolumeLevel(uint nChannel, float fLevelDB, ref Guid pguidEventContext);
+        [PreserveSig] int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, ref Guid pguidEventContext);
+        [PreserveSig] int GetChannelVolumeLevel(uint nChannel, out float pfLevelDB);
+        [PreserveSig] int GetChannelVolumeLevelScalar(uint nChannel, out float pfLevel);
+        [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool bMute, ref Guid pguidEventContext);
+        [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool pbMute);
+    }
+
+    [Guid("657804FA-D6AD-4496-8A60-352752AF4F89")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IAudioEndpointVolumeCallback
+    {
+        [PreserveSig] int OnNotify(IntPtr pNotify);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AUDIO_VOLUME_NOTIFICATION_DATA
+    {
+        public Guid guidEventContext;
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool bMuted;
+        public float fMasterVolume;
+        public uint nChannels;
     }
 
     [DllImport("kernel32.dll", EntryPoint = "RtlZeroMemory")]

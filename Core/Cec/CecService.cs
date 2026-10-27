@@ -54,94 +54,15 @@ public class CecService : IDisposable
                 _isConnecting = true;
             }
 
-            IntPtr configPtr = Marshal.AllocHGlobal(1024);
             try
             {
-                byte[] zeros = new byte[1024];
-                Marshal.Copy(zeros, 0, configPtr, 1024);
-
-                LibCec.libcec_clear_configuration(configPtr);
-
-                // clientVersion = 0x00040002
-                Marshal.WriteInt32(configPtr, 0, (4 << 16) | (0 << 8) | 2);
-
-                // strDeviceName = "BarControl" (offset 4)
-                byte[] nameBytes = Encoding.ASCII.GetBytes("BarControl\0");
-                Marshal.Copy(nameBytes, 0, configPtr + 4, nameBytes.Length);
-
-                // deviceTypes.types[0] = 1 (RECORDING_DEVICE) at offset 20
-                Marshal.WriteInt32(configPtr, 20, LibCec.CEC_DEVICE_TYPE_RECORDING_DEVICE);
-
-                // Clear wakeDevices (offset 56..75) and powerOffDevices (offset 76..95) to prevent libcec touching the TV/monitor
-                for (int i = 56; i < 96; i++)
+                if (ConnectOrReconnectAdapterInternal())
                 {
-                    Marshal.WriteByte(configPtr, i, 0);
+                    StartBackgroundMonitor();
                 }
-
-                // bActivateSource = 0 at offset 101: Never make adapter active source (prevents monitor HDMI port switching / screen blackout)
-                Marshal.WriteByte(configPtr, 101, 0);
-
-                LogService.LogInfo("CEC: Initializing libcec configuration (bActivateSource=0)...");
-                IntPtr conn = LibCec.libcec_initialise(configPtr);
-                if (conn == IntPtr.Zero)
-                {
-                    LogService.LogError("CEC: libcec_initialise returned NULL");
-                    return;
-                }
-
-                IntPtr descBuf = Marshal.AllocHGlobal(2064 * 10);
-                string comPort = "COM6";
-                try
-                {
-                    sbyte count = LibCec.libcec_detect_adapters(conn, descBuf, 10, null, 1);
-                    LogService.LogInfo($"CEC: Detected {count} adapter(s)");
-                    if (count > 0)
-                    {
-                        string? detectedName = Marshal.PtrToStringAnsi(descBuf + 1024);
-                        if (!string.IsNullOrEmpty(detectedName))
-                        {
-                            comPort = detectedName;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogService.LogWarn($"CEC: Adapter auto-detect warning: {ex.Message}. Falling back to COM6.");
-                }
-                finally
-                {
-                    Marshal.FreeHGlobal(descBuf);
-                }
-
-                LogService.LogInfo($"CEC: Opening adapter on {comPort}...");
-                int openResult = LibCec.libcec_open(conn, comPort, 10000);
-                if (openResult != 1)
-                {
-                    LogService.LogError($"CEC: libcec_open failed with code {openResult}");
-                    LibCec.libcec_destroy(conn);
-                    return;
-                }
-
-                lock (_lock)
-                {
-                    _conn = conn;
-                    IsConnected = true;
-                    AdapterPort = comPort;
-                }
-                LogService.LogInfo($"CEC: Connected successfully on {comPort}");
-
-                // Query initial status after bus discovery settles
-                Thread.Sleep(2000);
-                RefreshDeviceInfoInternal();
-                StartBackgroundMonitor();
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError("CEC: Error during InitializeAsync", ex);
             }
             finally
             {
-                Marshal.FreeHGlobal(configPtr);
                 lock (_lock)
                 {
                     _isConnecting = false;
@@ -149,6 +70,142 @@ public class CecService : IDisposable
                 StateChanged?.Invoke();
             }
         });
+    }
+
+    /// <summary>
+    /// Closes any existing libcec connection (e.g. a dead USB serial handle after Windows Hibernate)
+    /// and opens a fresh connection to the Pulse-Eight USB-CEC adapter.
+    /// </summary>
+    private bool ConnectOrReconnectAdapterInternal()
+    {
+        lock (_lock)
+        {
+            if (_isDisposed) return false;
+
+            if (_conn != IntPtr.Zero)
+            {
+                try
+                {
+                    LogService.LogInfo("CEC: Closing existing libcec handle before reconnecting...");
+                    LibCec.libcec_close(_conn);
+                    LibCec.libcec_destroy(_conn);
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogWarn($"CEC: Warning while closing old handle: {ex.Message}");
+                }
+                _conn = IntPtr.Zero;
+                IsConnected = false;
+            }
+        }
+
+        IntPtr configPtr = Marshal.AllocHGlobal(1024);
+        try
+        {
+            byte[] zeros = new byte[1024];
+            Marshal.Copy(zeros, 0, configPtr, 1024);
+
+            LibCec.libcec_clear_configuration(configPtr);
+
+            // clientVersion = 0x00040002
+            Marshal.WriteInt32(configPtr, 0, (4 << 16) | (0 << 8) | 2);
+
+            // strDeviceName = "BarControl" (offset 4)
+            byte[] nameBytes = Encoding.ASCII.GetBytes("BarControl\0");
+            Marshal.Copy(nameBytes, 0, configPtr + 4, nameBytes.Length);
+
+            // deviceTypes.types[0] = 1 (RECORDING_DEVICE) at offset 20
+            Marshal.WriteInt32(configPtr, 20, LibCec.CEC_DEVICE_TYPE_RECORDING_DEVICE);
+
+            // Clear wakeDevices (offset 56..75) and powerOffDevices (offset 76..95) to prevent libcec touching the TV/monitor
+            for (int i = 56; i < 96; i++)
+            {
+                Marshal.WriteByte(configPtr, i, 0);
+            }
+
+            // bActivateSource = 0 at offset 101: Never make adapter active source (prevents monitor HDMI port switching / screen blackout)
+            Marshal.WriteByte(configPtr, 101, 0);
+
+            LogService.LogInfo("CEC: Initializing libcec configuration (bActivateSource=0)...");
+            IntPtr conn = LibCec.libcec_initialise(configPtr);
+            if (conn == IntPtr.Zero)
+            {
+                LogService.LogError("CEC: libcec_initialise returned NULL");
+                return false;
+            }
+
+            IntPtr descBuf = Marshal.AllocHGlobal(2064 * 10);
+            string? comPort = null;
+            try
+            {
+                // Retry adapter detection up to 4 times in case USB serial is still enumerating after Hibernate resume
+                for (int attempt = 1; attempt <= 4; attempt++)
+                {
+                    sbyte count = LibCec.libcec_detect_adapters(conn, descBuf, 10, null, 1);
+                    LogService.LogInfo($"CEC: Detected {count} adapter(s) (attempt {attempt})");
+                    if (count > 0)
+                    {
+                        string? detectedName = Marshal.PtrToStringAnsi(descBuf + 1024);
+                        if (!string.IsNullOrEmpty(detectedName))
+                        {
+                            comPort = detectedName;
+                        }
+                        break;
+                    }
+                    Thread.Sleep(750);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogWarn($"CEC: Adapter auto-detect warning: {ex.Message}.");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(descBuf);
+            }
+
+            if (string.IsNullOrEmpty(comPort))
+            {
+                LogService.LogWarn("CEC: No Pulse-Eight USB-CEC adapter found on any COM port.");
+                LibCec.libcec_destroy(conn);
+                return false;
+            }
+
+            LogService.LogInfo($"CEC: Opening adapter on {comPort}...");
+            int openResult = LibCec.libcec_open(conn, comPort, 10000);
+            if (openResult != 1)
+            {
+                LogService.LogError($"CEC: libcec_open failed with code {openResult}");
+                LibCec.libcec_destroy(conn);
+                return false;
+            }
+
+            lock (_lock)
+            {
+                _conn = conn;
+                IsConnected = true;
+                AdapterPort = comPort;
+            }
+            LogService.LogInfo($"CEC: Connected successfully on {comPort}");
+
+            // Query initial status after bus discovery settles
+            Thread.Sleep(1500);
+            lock (_lock)
+            {
+                RefreshDeviceInfoInternal();
+            }
+            StateChanged?.Invoke();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogService.LogError("CEC: Error during ConnectOrReconnectAdapterInternal", ex);
+            return false;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(configPtr);
+        }
     }
 
     private void RefreshDeviceInfoInternal()
@@ -243,6 +300,14 @@ public class CecService : IDisposable
                         var oldAudio = AudioStatus;
 
                         RefreshDeviceInfoInternal();
+
+                        // If the background monitor sees PowerStatus drop to UNKNOWN (153 / 0x99),
+                        // the USB serial connection was reset (e.g. after Hibernate). Reconnect automatically.
+                        if (PowerStatus == LibCec.CEC_POWER_STATUS_UNKNOWN)
+                        {
+                            LogService.LogWarn("CEC: Background monitor detected PowerStatus=UNKNOWN (153). Reconnecting USB-CEC adapter...");
+                            ConnectOrReconnectAdapterInternal();
+                        }
 
                         if (PowerStatus != oldPower || AudioStatus != oldAudio)
                         {
@@ -342,6 +407,27 @@ public class CecService : IDisposable
         return Task.CompletedTask;
     }
 
+    public async Task SetMuteAsync(bool targetMute)
+    {
+        await Task.Run(() =>
+        {
+            lock (_lock)
+            {
+                if (_conn == IntPtr.Zero || !IsConnected) return;
+                if (AudioStatus.IsMuted == targetMute) return;
+
+                LogService.LogInfo($"CEC: Toggling soundbar mute to {targetMute}...");
+                LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, LibCec.CEC_USER_CONTROL_CODE_MUTE, 1);
+                LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
+                Thread.Sleep(70);
+
+                var st = QueryAudioStatusFromWire();
+                VolumeController.OnHardwareAudioStatusReported(st, syncRequestedIfIdle: false);
+            }
+            StateChanged?.Invoke();
+        });
+    }
+
     public async Task<bool> PowerOnSoundbarAsync()
     {
         return await Task.Run(() =>
@@ -359,6 +445,19 @@ public class CecService : IDisposable
                 {
                     // 1. Query live power status strictly for the target soundbar
                     RefreshDeviceInfoInternal();
+
+                    // Self-heal: if power status returned UNKNOWN (153 / 0x99), the USB-CEC COM handle was likely
+                    // invalidated by a Windows Hibernate / USB bus reset. Re-open the adapter before sending Power On.
+                    if (PowerStatus == LibCec.CEC_POWER_STATUS_UNKNOWN)
+                    {
+                        LogService.LogWarn("CEC: PowerStatus is UNKNOWN (153) before PowerOn — USB-CEC handle appears stale. Reconnecting adapter...");
+                        if (!ConnectOrReconnectAdapterInternal() || _conn == IntPtr.Zero)
+                        {
+                            LogService.LogError("CEC: Adapter reconnection failed during PowerOn.");
+                            return false;
+                        }
+                    }
+
                     if (PowerStatus == LibCec.CEC_POWER_STATUS_ON)
                     {
                         LogService.LogInfo($"CEC: Device {TargetLogicalAddress} is already powered ON. Idempotent check passed, no wake needed.");
@@ -420,6 +519,18 @@ public class CecService : IDisposable
                 {
                     // 1. Query live power status strictly for the target soundbar
                     RefreshDeviceInfoInternal();
+
+                    // Self-heal: if power status returned UNKNOWN (153 / 0x99), reconnect the USB-CEC adapter first
+                    if (PowerStatus == LibCec.CEC_POWER_STATUS_UNKNOWN)
+                    {
+                        LogService.LogWarn("CEC: PowerStatus is UNKNOWN (153) before Standby — USB-CEC handle appears stale. Reconnecting adapter...");
+                        if (!ConnectOrReconnectAdapterInternal() || _conn == IntPtr.Zero)
+                        {
+                            LogService.LogError("CEC: Adapter reconnection failed during Standby.");
+                            return false;
+                        }
+                    }
+
                     if (PowerStatus == LibCec.CEC_POWER_STATUS_STANDBY)
                     {
                         LogService.LogInfo($"CEC: Device {TargetLogicalAddress} is already in STANDBY. Idempotent check passed, no standby needed.");
@@ -482,17 +593,48 @@ public class CecService : IDisposable
 
     private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {
-        if (!AutoPowerSyncEnabled || !IsConnected) return;
-
         if (e.Mode == PowerModes.Suspend)
         {
-            // Windows PC going to sleep -> turn soundbar standby
-            _ = StandbySoundbarAsync();
+            LogService.LogInfo("CEC: Windows PowerModes.Suspend received.");
+            if (AutoPowerSyncEnabled && IsConnected)
+            {
+                // Windows PC going to sleep/hibernate -> turn soundbar standby
+                _ = StandbySoundbarAsync();
+            }
         }
         else if (e.Mode == PowerModes.Resume)
         {
-            // Windows PC waking from sleep -> wake soundbar
-            Task.Delay(1000).ContinueWith(_ => PowerOnSoundbarAsync());
+            LogService.LogInfo("CEC: Windows PowerModes.Resume received. Re-initializing USB-CEC connection and waking soundbar...");
+            _ = Task.Run(async () =>
+            {
+                // Allow Windows USB serial driver (COM6) a moment to re-enumerate after Hibernate/Suspend
+                await Task.Delay(1500);
+
+                // Always reconnect the USB-CEC handle on Resume because Hibernate invalidates open COM handles
+                lock (_lock)
+                {
+                    if (_isDisposed) return;
+                    _isActionInProgress = true;
+                }
+
+                try
+                {
+                    ConnectOrReconnectAdapterInternal();
+                }
+                finally
+                {
+                    lock (_lock)
+                    {
+                        _isActionInProgress = false;
+                    }
+                    StateChanged?.Invoke();
+                }
+
+                if (AutoPowerSyncEnabled)
+                {
+                    await PowerOnSoundbarAsync();
+                }
+            });
         }
     }
 

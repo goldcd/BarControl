@@ -1,4 +1,4 @@
-﻿# BarControl Windows Installer Script
+# BarControl Windows Installer Script
 # Installs BarControl cleanly to %LocalAppData%\Programs\BarControl (No Administrator Rights Required)
 # Can be run locally or streamed directly from GitHub:
 #   irm https://raw.githubusercontent.com/goldcd/BarControl/main/install.ps1 | iex
@@ -124,7 +124,7 @@ $wscript = New-Object -ComObject WScript.Shell
 $shortcut = $wscript.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $targetExe
 $shortcut.WorkingDirectory = $installDir
-$shortcut.Description = "BarControl - Not on That Monitor"
+$shortcut.Description = "BarControl - Soundbar & HDMI-CEC Control"
 if (Test-Path $iconPath) {
     $shortcut.IconLocation = $iconPath
 } else {
@@ -140,7 +140,7 @@ if (-not (Test-Path $uninstallRegKey)) {
 }
 
 # Extract actual version from installed executable
-$appVersion = "1.0.0"
+$appVersion = "0.1.0"
 if (Test-Path $targetExe) {
     try {
         $rawVer = (Get-Item $targetExe).VersionInfo.ProductVersion
@@ -152,7 +152,7 @@ if (Test-Path $targetExe) {
     } catch { }
 }
 
-Set-ItemProperty -Path $uninstallRegKey -Name "DisplayName" -Value "BarControl - Not on That Monitor"
+Set-ItemProperty -Path $uninstallRegKey -Name "DisplayName" -Value "BarControl - Soundbar & HDMI-CEC Control"
 Set-ItemProperty -Path $uninstallRegKey -Name "DisplayVersion" -Value $appVersion
 Set-ItemProperty -Path $uninstallRegKey -Name "Publisher" -Value "goldcd"
 Set-ItemProperty -Path $uninstallRegKey -Name "DisplayIcon" -Value $targetExe

@@ -40,10 +40,6 @@ public static class LogService
         Write("ERROR", sb.ToString());
     }
 
-    private static readonly string? WorkspaceLogFilePath = Directory.Exists(@"e:\projects\BarControl")
-        ? @"e:\projects\BarControl\barcontrol.log"
-        : null;
-
     private static void Write(string level, string message)
     {
         lock (_lock)
@@ -52,10 +48,6 @@ public static class LogService
             {
                 string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{level}] [T{Environment.CurrentManagedThreadId}] {message}";
                 File.AppendAllText(LogFilePath, line + Environment.NewLine, Encoding.UTF8);
-                if (WorkspaceLogFilePath != null)
-                {
-                    File.AppendAllText(WorkspaceLogFilePath, line + Environment.NewLine, Encoding.UTF8);
-                }
                 System.Diagnostics.Debug.WriteLine(line);
             }
             catch

@@ -7,8 +7,8 @@
         mc:Ignorable="d"
         Title="BarControl - Soundbar &amp; HDMI-CEC Control"
         Icon="pack://application:,,,/Assets/app.ico"
-        Height="630" Width="680"
-        MinHeight="540" MinWidth="580"
+        Height="785" Width="680"
+        MinHeight="720" MinWidth="580"
         WindowStartupLocation="CenterScreen"
         Background="#161618"
         Foreground="#EDEDED"
@@ -243,34 +243,23 @@
         </Grid.RowDefinitions>
 
         <!-- ================= 0: HEADER BAR ================= -->
-        <Border Grid.Row="0" Margin="0,0,0,16" Padding="0,0,0,12" BorderBrush="#25252A" BorderThickness="0,0,0,1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+        <Border Grid.Row="0" Margin="0,0,0,12" Padding="0,0,0,10" BorderBrush="#25252A" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <CheckBox Content="Start with Windows"
+                          IsChecked="{Binding StartWithWindows}"
+                          Foreground="#9E9EA6"
+                          FontSize="11.5"
+                          Margin="0,0,14,0"
+                          VerticalAlignment="Center"
+                          Cursor="Hand"/>
 
-                <!-- Left: App Brand Title -->
-                <TextBlock Grid.Column="0" Text="Bar Control" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-
-                <!-- Right: Options -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <CheckBox Content="Start with Windows"
-                              IsChecked="{Binding StartWithWindows}"
-                              Foreground="#9E9EA6"
-                              FontSize="11.5"
-                              Margin="0,0,14,0"
-                              VerticalAlignment="Center"
-                              Cursor="Hand"/>
-
-                    <CheckBox Content="Start Minimized"
-                              IsChecked="{Binding StartMinimized}"
-                              Foreground="#9E9EA6"
-                              FontSize="11.5"
-                              VerticalAlignment="Center"
-                              Cursor="Hand"/>
-                </StackPanel>
-            </Grid>
+                <CheckBox Content="Start Minimized"
+                          IsChecked="{Binding StartMinimized}"
+                          Foreground="#9E9EA6"
+                          FontSize="11.5"
+                          VerticalAlignment="Center"
+                          Cursor="Hand"/>
+            </StackPanel>
         </Border>
 
         <!-- ================= 1: SOUNDBAR SELECTION & DISPLAY/AUDIO GUARDING ================= -->
@@ -548,35 +537,60 @@
                     </StackPanel>
                 </Border>
 
-                <!-- FEATURE CARD 2: DOLBY ATMOS & BITSTREAM VOLUME BRIDGE PREVIEW -->
-                <Border Background="#1A1A1E"
-                        BorderBrush="#26262B"
+                <!-- FEATURE CARD 2: DOLBY ATMOS / BITSTREAM CEC VOLUME PROXY -->
+                <Border Background="#1E1E22"
+                        BorderBrush="{Binding BitstreamProxyCardBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="8"
-                        Padding="16,12">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                        Padding="16,14">
+                    <StackPanel>
+                        <!-- Card Header + Live Status Badge -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="🎵" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Dolby Atmos / Bitstream CEC Volume Proxy" FontSize="13" FontWeight="SemiBold" Foreground="#D4D4D8"/>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="🎵" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Dolby Atmos / Bitstream Volume Proxy" FontSize="14.5" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                             </StackPanel>
-                            <TextBlock Text="Proxies Windows volume controls via HDMI-CEC when streaming Atmos or DTS direct audio."
-                                       FontSize="11" Foreground="#71717A" TextWrapping="Wrap" Margin="0,3,0,0"/>
-                        </StackPanel>
 
-                        <Border Grid.Column="1"
-                                Background="#2A2A30"
-                                CornerRadius="5"
-                                Padding="8,3"
-                                VerticalAlignment="Center">
-                            <TextBlock Text="Next Feature" FontSize="10" FontWeight="SemiBold" Foreground="#A1A1AA"/>
+                            <Border Grid.Column="1"
+                                    Background="{Binding BitstreamProxyBadgeBackground}"
+                                    BorderBrush="{Binding BitstreamProxyBadgeBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="5"
+                                    Padding="9,3"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding BitstreamProxyStatusText}"
+                                           FontSize="10.5"
+                                           FontWeight="Bold"
+                                           Foreground="{Binding BitstreamProxyBadgeForeground}"/>
+                            </Border>
+                        </Grid>
+
+                        <!-- Toggle Row -->
+                        <Border Background="#25252A" CornerRadius="6" Padding="12,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Text="Seamless Keyboard Volume Bridge &amp; Auto-Restore" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock Text="{Binding BitstreamProxySubtitleText}"
+                                               FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                </StackPanel>
+
+                                <CheckBox Grid.Column="1"
+                                          IsChecked="{Binding IsBitstreamProxyEnabled}"
+                                          VerticalAlignment="Center"
+                                          Cursor="Hand"/>
+                            </Grid>
                         </Border>
-                    </Grid>
+                    </StackPanel>
                 </Border>
             </StackPanel>
         </ScrollViewer>
@@ -589,11 +603,35 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: App Version & Status -->
+                <!-- Left: App Version & Update Notification -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="BarControl " FontSize="11" Foreground="#71717A"/>
-                    <TextBlock Text="{Binding AppVersion}" FontSize="11" Foreground="#A1A1AA"/>
-                    <TextBlock Text=" • Pulse-Eight HDMI-CEC Ready" FontSize="11" Foreground="#52525B" Margin="6,0,0,0"/>
+                    <TextBlock Text="BarControl " FontSize="11" Foreground="#71717A" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding AppVersion}" FontSize="11" Foreground="#A1A1AA" VerticalAlignment="Center" ToolTip="Current running version"/>
+
+                    <!-- Update notification & one-click action (only visible if a newer GitHub release is available) -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0"
+                                Visibility="{Binding IsUpdateAvailable, Converter={x:Static ui:BooleanToVisibilityConverter.Instance}}">
+                        <Border Background="#1E293B" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" VerticalAlignment="Center">
+                            <TextBlock Text="UPDATE" FontSize="9.5" FontWeight="Bold" Foreground="#60A5FA"/>
+                        </Border>
+                        <TextBlock Text="New version available: " FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding AvailableUpdateVersion}" FontSize="11" FontWeight="SemiBold" Foreground="#F1F5F9" VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                        <Button Content="{Binding UpdateButtonText}"
+                                Click="OnApplyUpdateClicked"
+                                IsEnabled="{Binding IsDownloadingUpdate, Converter={x:Static ui:InverseBooleanConverter.Instance}}"
+                                Background="#2563EB" Foreground="White" BorderThickness="0"
+                                Padding="10,3" FontSize="11" FontWeight="SemiBold" Cursor="Hand"
+                                VerticalAlignment="Center">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- Right: Sweep button -->

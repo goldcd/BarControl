@@ -23,6 +23,7 @@ public partial class App : Application
     private TrayIconService? _trayService;
     private AudioKeepAliveService? _audioService;
     private CecService? _cecService;
+    private BitstreamVolumeProxyService? _bitstreamProxyService;
     private MainWindowViewModel? _viewModel;
     private MainWindow? _mainWindow;
 
@@ -56,7 +57,7 @@ public partial class App : Application
         if (!isNewInstance)
         {
             MessageBox.Show(
-                "BarControl is already running in your system tray.\nLook for the monitor icon in the bottom-right taskbar.",
+                "BarControl is already running in your system tray.\nLook for the soundbar icon in the bottom-right taskbar.",
                 "BarControl - Already Running",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -69,8 +70,9 @@ public partial class App : Application
         _trayService = new TrayIconService();
         _audioService = new AudioKeepAliveService(startEnabled: true);
         _cecService = new CecService();
+        _bitstreamProxyService = new BitstreamVolumeProxyService(_cecService, startEnabled: true);
 
-        _viewModel = new MainWindowViewModel(_engine, _trayService, _audioService, _cecService);
+        _viewModel = new MainWindowViewModel(_engine, _trayService, _audioService, _cecService, _bitstreamProxyService);
         _mainWindow = new MainWindow(_viewModel);
 
         _trayService.OnOpenRequested += ShowMainWindow;
@@ -120,9 +122,14 @@ public partial class App : Application
 
         _mainWindow.Activate();
         _mainWindow.Focus();
+
+        if (_viewModel != null)
+        {
+            _ = _viewModel.CheckForUpdatesAsync();
+        }
     }
 
-    private void ShutdownApplication()
+    public void ShutdownApplication()
     {
         if (!Dispatcher.CheckAccess())
         {
@@ -134,6 +141,7 @@ public partial class App : Application
         {
             LogService.LogInfo("App: Shutdown requested from Tray or User");
             _mainWindow?.RequestExplicitExit();
+            _bitstreamProxyService?.Dispose();
             _cecService?.Dispose();
             _audioService?.Dispose();
             _engine?.Dispose();
@@ -163,6 +171,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         LogService.LogInfo("App: OnExit triggered");
+        _bitstreamProxyService?.Dispose();
         _cecService?.Dispose();
         _audioService?.Dispose();
         _engine?.Dispose();

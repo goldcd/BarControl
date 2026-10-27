@@ -14,6 +14,7 @@ using BarControl.Core.Display;
 using BarControl.Core.Engine;
 using BarControl.Core.Startup;
 using BarControl.Core.Tray;
+using BarControl.Core.Update;
 
 namespace BarControl.UI;
 
@@ -23,6 +24,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private readonly TrayIconService _trayService;
     private readonly AudioKeepAliveService? _audioService;
     private readonly CecService? _cecService;
+    private readonly BitstreamVolumeProxyService? _bitstreamProxyService;
     private readonly AppSettings _settings;
 
     private bool _isGuardActive = true;
@@ -51,7 +53,92 @@ public class MainWindowViewModel : INotifyPropertyChanged
         get
         {
             var v = typeof(MainWindowViewModel).Assembly.GetName().Version;
-            return v != null ? $"v{v.Major}.{v.Minor}.{Math.Max(v.Build, 0)}" : "v1.0.0";
+            return v != null ? $"v{v.Major}.{v.Minor}.{Math.Max(v.Build, 0)}" : "v0.1.0";
+        }
+    }
+
+    private readonly UpdateService _updateService = new();
+    private UpdateInfo? _availableUpdate;
+    private bool _isDownloadingUpdate;
+    private string _updateButtonText = "Update";
+    private DateTime _lastUpdateCheckUtc = DateTime.MinValue;
+
+    public bool IsUpdateAvailable => _availableUpdate != null;
+    public string? AvailableUpdateVersion => _availableUpdate?.Version;
+
+    public bool IsDownloadingUpdate
+    {
+        get => _isDownloadingUpdate;
+        set
+        {
+            if (_isDownloadingUpdate != value)
+            {
+                _isDownloadingUpdate = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public string UpdateButtonText
+    {
+        get => _updateButtonText;
+        set
+        {
+            if (_updateButtonText != value)
+            {
+                _updateButtonText = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public async Task CheckForUpdatesAsync(bool force = false)
+    {
+        try
+        {
+            if (!force && (DateTime.UtcNow - _lastUpdateCheckUtc).TotalSeconds < 30)
+                return;
+
+            _lastUpdateCheckUtc = DateTime.UtcNow;
+            var update = await _updateService.CheckForUpdateAsync();
+            if (update != null)
+            {
+                Application.Current?.Dispatcher.InvokeAsync(() =>
+                {
+                    _availableUpdate = update;
+                    UpdateButtonText = $"Update to {update.Version}";
+                    OnPropertyChanged(nameof(IsUpdateAvailable));
+                    OnPropertyChanged(nameof(AvailableUpdateVersion));
+                });
+            }
+        }
+        catch
+        {
+            // Silently ignore check failures
+        }
+    }
+
+    public async Task ApplyUpdateAsync()
+    {
+        if (_availableUpdate == null || IsDownloadingUpdate)
+            return;
+
+        try
+        {
+            IsDownloadingUpdate = true;
+            UpdateButtonText = "Downloading...";
+            var progress = new Progress<double>(p =>
+            {
+                UpdateButtonText = $"Downloading... {p:P0}";
+            });
+
+            await _updateService.ApplyUpdateAsync(_availableUpdate, progress);
+        }
+        catch (Exception ex)
+        {
+            IsDownloadingUpdate = false;
+            UpdateButtonText = "Update failed (retry)";
+            MessageBox.Show($"Could not apply update:\n{ex.Message}", "Update Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -88,12 +175,14 @@ public class MainWindowViewModel : INotifyPropertyChanged
         WindowRelocationEngine engine,
         TrayIconService trayService,
         AudioKeepAliveService? audioService = null,
-        CecService? cecService = null)
+        CecService? cecService = null,
+        BitstreamVolumeProxyService? bitstreamProxyService = null)
     {
         _engine = engine;
         _trayService = trayService;
         _audioService = audioService;
         _cecService = cecService;
+        _bitstreamProxyService = bitstreamProxyService;
         _settings = ConfigService.Load();
 
         if (_audioService != null)
@@ -107,10 +196,37 @@ public class MainWindowViewModel : INotifyPropertyChanged
             _cecService.StateChanged += OnCecStateChanged;
         }
 
+        if (_bitstreamProxyService != null)
+        {
+            _bitstreamProxyService.IsEnabled = _settings.BitstreamVolumeProxyEnabled;
+            _bitstreamProxyService.StateChanged += OnBitstreamProxyStateChanged;
+        }
+
         _isGuardActive = _settings.IsGuardEnabled;
         _trayService.SetGuardState(_isGuardActive);
 
         LoadDisplays();
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(2000);
+            await CheckForUpdatesAsync(force: true);
+        });
+    }
+
+    private void OnBitstreamProxyStateChanged()
+    {
+        Application.Current?.Dispatcher.InvokeAsync(() =>
+        {
+            OnPropertyChanged(nameof(IsBitstreamProxyEnabled));
+            OnPropertyChanged(nameof(IsBitstreamActive));
+            OnPropertyChanged(nameof(BitstreamProxyStatusText));
+            OnPropertyChanged(nameof(BitstreamProxySubtitleText));
+            OnPropertyChanged(nameof(BitstreamProxyBadgeBackground));
+            OnPropertyChanged(nameof(BitstreamProxyBadgeBorderBrush));
+            OnPropertyChanged(nameof(BitstreamProxyBadgeForeground));
+            OnPropertyChanged(nameof(BitstreamProxyCardBorderBrush));
+        });
     }
 
     private void OnCecStateChanged()
@@ -139,6 +255,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
                     _settings.SelectedSoundbarIdentifier = !string.IsNullOrEmpty(value.HardwareId) ? value.HardwareId : value.FriendlyName;
                     SaveSettings();
                 }
+                UpdateBitstreamProxyTarget();
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsPhantomDisplayGuardEnabled));
                 OnPropertyChanged(nameof(CanEnablePhantomDisplayGuard));
@@ -147,6 +264,92 @@ public class MainWindowViewModel : INotifyPropertyChanged
             }
         }
     }
+
+    public bool IsBitstreamProxyEnabled
+    {
+        get => _settings.BitstreamVolumeProxyEnabled;
+        set
+        {
+            if (_settings.BitstreamVolumeProxyEnabled != value)
+            {
+                _settings.BitstreamVolumeProxyEnabled = value;
+                if (_bitstreamProxyService != null)
+                {
+                    _bitstreamProxyService.IsEnabled = value;
+                }
+                SaveSettings();
+                OnPropertyChanged();
+                OnBitstreamProxyStateChanged();
+            }
+        }
+    }
+
+    public bool IsBitstreamActive => _bitstreamProxyService?.IsBitstreamActive ?? false;
+
+    public string BitstreamProxyStatusText
+    {
+        get
+        {
+            if (!IsBitstreamProxyEnabled) return "DISABLED";
+            return IsBitstreamActive ? "⚡ ATMOS / BITSTREAM ACTIVE" : "STANDBY (PCM)";
+        }
+    }
+
+    public string BitstreamProxySubtitleText
+    {
+        get
+        {
+            if (IsBitstreamActive && _bitstreamProxyService != null)
+            {
+                string restoreHint = (_bitstreamProxyService.SavedWindowsVolume >= 0 && _bitstreamProxyService.SavedSoundbarVolume >= 0)
+                    ? $" (will restore Win: {_bitstreamProxyService.SavedWindowsVolume}%, Bar: {_bitstreamProxyService.SavedSoundbarVolume}% when stream ends)"
+                    : string.Empty;
+                return $"Active: Keyboard & Windows volume controls are now directly driving your soundbar via HDMI-CEC{restoreHint}.";
+            }
+            return "Automatically detects Dolby Atmos / DTS streams, relays keyboard volume keys to your soundbar, and restores prior volume levels when playback stops.";
+        }
+    }
+
+    public Brush BitstreamProxyBadgeBackground
+    {
+        get
+        {
+            if (!IsBitstreamProxyEnabled)
+                return new SolidColorBrush(Color.FromRgb(38, 38, 43));
+            if (IsBitstreamActive)
+                return new SolidColorBrush(Color.FromRgb(6, 78, 59)); // Deep Emerald
+            return new SolidColorBrush(Color.FromRgb(39, 39, 46));
+        }
+    }
+
+    public Brush BitstreamProxyBadgeBorderBrush
+    {
+        get
+        {
+            if (!IsBitstreamProxyEnabled)
+                return new SolidColorBrush(Color.FromRgb(56, 56, 64));
+            if (IsBitstreamActive)
+                return new SolidColorBrush(Color.FromRgb(16, 185, 129)); // Bright Emerald Border
+            return new SolidColorBrush(Color.FromRgb(63, 63, 72));
+        }
+    }
+
+    public Brush BitstreamProxyBadgeForeground
+    {
+        get
+        {
+            if (!IsBitstreamProxyEnabled)
+                return new SolidColorBrush(Color.FromRgb(113, 113, 122));
+            if (IsBitstreamActive)
+                return new SolidColorBrush(Color.FromRgb(52, 211, 153)); // Bright Emerald Text
+            return new SolidColorBrush(Color.FromRgb(161, 161, 170));
+        }
+    }
+
+    public Brush BitstreamProxyCardBorderBrush =>
+        (IsBitstreamProxyEnabled && IsBitstreamActive)
+            ? new SolidColorBrush(Color.FromRgb(16, 185, 129))
+            : new SolidColorBrush(Color.FromRgb(44, 44, 50));
 
     /// <summary>
     /// Safety Protection: The Windows Primary (or Target Primary) monitor can NEVER be guarded/excluded,
@@ -212,9 +415,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public bool IsCecConnected => _cecService?.IsConnected ?? false;
-    public string CecPortName => _cecService?.AdapterPort ?? "COM6";
-    public string SoundbarCecName => _cecService?.SoundbarName ?? "Audio";
-    public string SoundbarVendor => _cecService?.SoundbarVendor ?? "Panasonic";
+    public string CecPortName => _cecService?.AdapterPort ?? "Auto-Detecting";
+    public string SoundbarCecName => _cecService?.SoundbarName ?? "HDMI Soundbar";
+    public string SoundbarVendor => (_cecService?.SoundbarVendor is { Length: > 0 } v && v != "Unknown") ? v : "";
 
     public int CecActualVolumePercent => _cecService?.VolumeController.ActualVolume ?? 0;
     public int CecRequestedVolumePercent => _cecService?.VolumeController.RequestedVolume ?? 0;
@@ -594,6 +797,21 @@ public class MainWindowViewModel : INotifyPropertyChanged
         UpdateExcludedSettingsList();
         SyncConfiguration();
         UpdateAudioKeepAliveTargets();
+        UpdateBitstreamProxyTarget();
+    }
+
+    private void UpdateBitstreamProxyTarget()
+    {
+        if (_bitstreamProxyService == null) return;
+
+        string? endpointId = SelectedSoundbar?.AudioEndpointId;
+        if (string.IsNullOrEmpty(endpointId))
+        {
+            endpointId = Displays.FirstOrDefault(d => !d.IsOsPrimary && d.HasAudioEndpoint && !string.IsNullOrEmpty(d.AudioEndpointId))?.AudioEndpointId
+                      ?? Displays.FirstOrDefault(d => d.HasAudioEndpoint && !string.IsNullOrEmpty(d.AudioEndpointId))?.AudioEndpointId;
+        }
+
+        _bitstreamProxyService.SetTargetEndpoint(endpointId);
     }
 
     private void EnsureValidTargetPrimary()

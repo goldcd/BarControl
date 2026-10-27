@@ -39,7 +39,7 @@ public class UpdateService
                 return null;
 
             string tagName = tagProp.GetString() ?? string.Empty;
-            string cleanTag = tagName.TrimStart('v', 'V');
+            string cleanTag = tagName.TrimStart('v', 'V', '.');
 
             if (!Version.TryParse(cleanTag, out var remoteVersion))
                 return null;
@@ -48,8 +48,21 @@ public class UpdateService
             if (currentVersion == null)
                 return null;
 
+            // Normalize both versions to 4 components (Major.Minor.Build.Revision) so e.g. "v0.1" == "0.1.0.0"
+            var normalizedRemote = new Version(
+                remoteVersion.Major,
+                remoteVersion.Minor,
+                Math.Max(remoteVersion.Build, 0),
+                Math.Max(remoteVersion.Revision, 0));
+
+            var normalizedCurrent = new Version(
+                currentVersion.Major,
+                currentVersion.Minor,
+                Math.Max(currentVersion.Build, 0),
+                Math.Max(currentVersion.Revision, 0));
+
             // Only notify if remote version is strictly newer
-            if (remoteVersion <= currentVersion)
+            if (normalizedRemote <= normalizedCurrent)
                 return null;
 
             string htmlUrl = root.TryGetProperty("html_url", out var htmlProp) ? htmlProp.GetString() ?? string.Empty : string.Empty;
@@ -156,6 +169,16 @@ del ""%~f0""
         };
 
         Process.Start(psi);
-        Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            if (Application.Current is App app)
+            {
+                app.ShutdownApplication();
+            }
+            else
+            {
+                Application.Current.Shutdown();
+            }
+        });
     }
 }

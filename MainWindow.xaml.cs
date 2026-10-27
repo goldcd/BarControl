@@ -115,4 +115,9 @@ public partial class MainWindow : Window
     {
         await ViewModel.StepVolumeDownAsync();
     }
+
+    private async void OnApplyUpdateClicked(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplyUpdateAsync();
+    }
 }

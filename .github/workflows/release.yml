@@ -1,4 +1,4 @@
-﻿name: Release
+name: Release
 
 on:
   push:
@@ -36,7 +36,12 @@ jobs:
           ''
         }
 
-        $cleanVersion = if ($rawTag -match '^v?(\d+\.\d+\.\d+.*)$') { $Matches[1] } else { '' }
+        $cleanVersion = if ($rawTag -match '^[vV\.]*(\d+\.\d+(?:\.\d+.*)?)$') {
+          $ver = $Matches[1]
+          if ($ver -match '^\d+\.\d+$') { "$ver.0" } else { $ver }
+        } else {
+          ''
+        }
         $displayTag = if ($rawTag) { $rawTag } else { 'dev' }
 
         "value=$cleanVersion" >> $env:GITHUB_OUTPUT
