@@ -20,6 +20,8 @@ public class CecService : IDisposable
     private bool _isActionInProgress;
     private CancellationTokenSource? _pollCts;
 
+    public int TargetLogicalAddress { get; set; } = LibCec.CECDEVICE_AUDIOSYSTEM;
+
     public bool IsConnected { get; private set; }
     public string? AdapterPort { get; private set; }
     public string SoundbarName { get; private set; } = "HDMI Soundbar";
@@ -65,7 +67,16 @@ public class CecService : IDisposable
                 // deviceTypes.types[0] = 1 (RECORDING_DEVICE) at offset 20
                 Marshal.WriteInt32(configPtr, 20, LibCec.CEC_DEVICE_TYPE_RECORDING_DEVICE);
 
-                LogService.LogInfo("CEC: Initializing libcec configuration...");
+                // Clear wakeDevices (offset 56..75) and powerOffDevices (offset 76..95) to prevent libcec touching the TV/monitor
+                for (int i = 56; i < 96; i++)
+                {
+                    Marshal.WriteByte(configPtr, i, 0);
+                }
+
+                // bActivateSource = 0 at offset 101: Never make adapter active source (prevents monitor HDMI port switching / screen blackout)
+                Marshal.WriteByte(configPtr, 101, 0);
+
+                LogService.LogInfo("CEC: Initializing libcec configuration (bActivateSource=0)...");
                 IntPtr conn = LibCec.libcec_initialise(configPtr);
                 if (conn == IntPtr.Zero)
                 {
@@ -141,15 +152,15 @@ public class CecService : IDisposable
 
         try
         {
-            // 1. Force fresh power status directly from the wire (0x8F)
+            // 1. Force fresh power status directly from the wire (0x8F) strictly to TargetLogicalAddress
             var pwrCmd = CecCommand.Create(
                 LibCec.CECDEVICE_RECORDINGDEVICE1,
-                LibCec.CECDEVICE_AUDIOSYSTEM,
+                TargetLogicalAddress,
                 LibCec.CEC_OPCODE_GIVE_DEVICE_POWER_STATUS);
             LibCec.libcec_transmit(_conn, ref pwrCmd);
 
-            Thread.Sleep(250);
-            int pwr = LibCec.libcec_get_device_power_status(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
+            Thread.Sleep(200);
+            int pwr = LibCec.libcec_get_device_power_status(_conn, TargetLogicalAddress);
             PowerStatus = pwr;
 
             // 2. Query audio status
@@ -162,7 +173,7 @@ public class CecService : IDisposable
             if (SoundbarName == "HDMI Soundbar")
             {
                 byte[] nameBuf = new byte[64];
-                if (LibCec.libcec_get_device_osd_name(_conn, LibCec.CECDEVICE_AUDIOSYSTEM, nameBuf) == 1)
+                if (LibCec.libcec_get_device_osd_name(_conn, TargetLogicalAddress, nameBuf) == 1)
                 {
                     string osd = Encoding.ASCII.GetString(nameBuf).TrimEnd('\0').Trim();
                     if (!string.IsNullOrEmpty(osd))
@@ -175,7 +186,7 @@ public class CecService : IDisposable
             // 4. Only query Vendor if not yet resolved
             if (SoundbarVendor == "Unknown")
             {
-                uint vendorId = LibCec.libcec_get_device_vendor_id(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
+                uint vendorId = LibCec.libcec_get_device_vendor_id(_conn, TargetLogicalAddress);
                 byte[] vendorBuf = new byte[64];
                 LibCec.libcec_vendor_id_to_string(vendorId, vendorBuf, (UIntPtr)64);
                 string vendor = Encoding.ASCII.GetString(vendorBuf).TrimEnd('\0').Trim();
@@ -185,7 +196,7 @@ public class CecService : IDisposable
                 }
             }
 
-            LogService.LogInfo($"CEC: Status updated. Power={PowerStatus}, Vol={vol}%, Muted={isMuted}, Vendor={SoundbarVendor}, Name={SoundbarName}");
+            LogService.LogInfo($"CEC: Status updated for device {TargetLogicalAddress}. Power={PowerStatus}, Vol={vol}%, Muted={isMuted}, Vendor={SoundbarVendor}, Name={SoundbarName}");
         }
         catch (Exception ex)
         {
@@ -250,40 +261,32 @@ public class CecService : IDisposable
                 _isActionInProgress = true;
                 try
                 {
-                    // 1. Query live power status
+                    // 1. Query live power status strictly for the target soundbar
                     RefreshDeviceInfoInternal();
                     if (PowerStatus == LibCec.CEC_POWER_STATUS_ON)
                     {
-                        LogService.LogInfo("CEC: Soundbar is already powered ON. Idempotent check passed, no wake needed.");
+                        LogService.LogInfo($"CEC: Device {TargetLogicalAddress} is already powered ON. Idempotent check passed, no wake needed.");
                         return true;
                     }
 
-                    LogService.LogInfo("CEC: Sending discrete Power On (<System Audio Mode Request> 0x70 [1.0.0.0])...");
+                    LogService.LogInfo($"CEC: Sending targeted Power On strictly to device {TargetLogicalAddress}...");
                     PowerStatus = LibCec.CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON;
                     StateChanged?.Invoke();
 
-                    // Send discrete SAM Request with physical address 1.0.0.0 [0x10, 0x00]
-                    var samCmd = CecCommand.Create(
-                        LibCec.CECDEVICE_RECORDINGDEVICE1,
-                        LibCec.CECDEVICE_AUDIOSYSTEM,
-                        LibCec.CEC_OPCODE_SYSTEM_AUDIO_MODE_REQUEST,
-                        CecDatapacket.Create(0x10, 0x00));
-                    LibCec.libcec_transmit(_conn, ref samCmd);
+                    // Targeted attempt 1: Discrete Power On Function key (0x6D) addressed ONLY to soundbar
+                    LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, LibCec.CEC_USER_CONTROL_CODE_POWER_ON_FUNCTION, 1);
+                    LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
 
-                    // Also signal libcec power on devices
-                    LibCec.libcec_power_on_devices(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
-
-                    // Wait 1.5s for soundbar power up
                     Thread.Sleep(1500);
                     RefreshDeviceInfoInternal();
 
-                    // Fallback to discrete Power On function key if not yet reported ON
+                    // Targeted attempt 2: Targeted Power button key (0x40) addressed ONLY to soundbar
                     if (PowerStatus != LibCec.CEC_POWER_STATUS_ON)
                     {
-                        LogService.LogInfo("CEC: Sending secondary discrete Power On Function key (0x6D)...");
-                        LibCec.libcec_send_keypress(_conn, LibCec.CECDEVICE_AUDIOSYSTEM, LibCec.CEC_USER_CONTROL_CODE_POWER_ON_FUNCTION, 1);
-                        LibCec.libcec_send_key_release(_conn, LibCec.CECDEVICE_AUDIOSYSTEM, 1);
-                        Thread.Sleep(1500);
+                        LogService.LogInfo($"CEC: Trying targeted Power key (0x40) strictly to device {TargetLogicalAddress}...");
+                        LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, LibCec.CEC_USER_CONTROL_CODE_POWER, 1);
+                        LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
+                        Thread.Sleep(2000);
                         RefreshDeviceInfoInternal();
                     }
 
@@ -319,38 +322,38 @@ public class CecService : IDisposable
                 _isActionInProgress = true;
                 try
                 {
-                    // 1. Query live power status
+                    // 1. Query live power status strictly for the target soundbar
                     RefreshDeviceInfoInternal();
                     if (PowerStatus == LibCec.CEC_POWER_STATUS_STANDBY)
                     {
-                        LogService.LogInfo("CEC: Soundbar is already in STANDBY. Idempotent check passed, no standby needed.");
+                        LogService.LogInfo($"CEC: Device {TargetLogicalAddress} is already in STANDBY. Idempotent check passed, no standby needed.");
                         return true;
                     }
 
-                    LogService.LogInfo("CEC: Sending discrete Standby (<Standby> 0x36)...");
+                    LogService.LogInfo($"CEC: Sending targeted Standby strictly to device {TargetLogicalAddress} (<Standby> 0x36)...");
                     PowerStatus = LibCec.CEC_POWER_STATUS_IN_TRANSITION_ON_TO_STANDBY;
                     StateChanged?.Invoke();
 
-                    // 1. Send targeted Standby (0x36) directly to device 5
+                    // Send targeted Standby (0x36) strictly to TargetLogicalAddress (NEVER broadcast 15, NEVER TV 0)
                     var standbyDirect = CecCommand.Create(
                         LibCec.CECDEVICE_RECORDINGDEVICE1,
-                        LibCec.CECDEVICE_AUDIOSYSTEM,
+                        TargetLogicalAddress,
                         LibCec.CEC_OPCODE_STANDBY);
                     LibCec.libcec_transmit(_conn, ref standbyDirect);
-
-                    // 2. Send broadcast Standby (0x36) to address 15
-                    var standbyBroadcast = CecCommand.Create(
-                        LibCec.CECDEVICE_RECORDINGDEVICE1,
-                        LibCec.CECDEVICE_BROADCAST,
-                        LibCec.CEC_OPCODE_STANDBY);
-                    LibCec.libcec_transmit(_conn, ref standbyBroadcast);
-
-                    // 3. Also signal libcec standby
-                    LibCec.libcec_standby_devices(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
 
                     // Wait 1.5s for standby relay transition
                     Thread.Sleep(1500);
                     RefreshDeviceInfoInternal();
+
+                    // If still on, send confirmed targeted Power key (0x40) strictly to soundbar
+                    if (PowerStatus != LibCec.CEC_POWER_STATUS_STANDBY && PowerStatus != LibCec.CEC_POWER_STATUS_IN_TRANSITION_ON_TO_STANDBY)
+                    {
+                        LogService.LogInfo($"CEC: Trying targeted Power key (0x40) strictly to device {TargetLogicalAddress} for standby...");
+                        LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, LibCec.CEC_USER_CONTROL_CODE_POWER, 1);
+                        LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
+                        Thread.Sleep(2000);
+                        RefreshDeviceInfoInternal();
+                    }
 
                     LogService.LogInfo($"CEC: Post-standby power status: {PowerStatus}");
                     return PowerStatus == LibCec.CEC_POWER_STATUS_STANDBY;
