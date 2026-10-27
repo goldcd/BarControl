@@ -111,8 +111,16 @@ public partial class App : Application
         _engine?.Dispose();
         _trayService?.Dispose();
 
-        _singleInstanceMutex?.ReleaseMutex();
-        _singleInstanceMutex?.Dispose();
+        try
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+            _singleInstanceMutex?.Dispose();
+        }
+        catch { }
+        finally
+        {
+            _singleInstanceMutex = null;
+        }
 
         Shutdown();
     }
@@ -123,8 +131,16 @@ public partial class App : Application
         _engine?.Dispose();
         _trayService?.Dispose();
 
-        _singleInstanceMutex?.ReleaseMutex();
-        _singleInstanceMutex?.Dispose();
+        try
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+            _singleInstanceMutex?.Dispose();
+        }
+        catch { }
+        finally
+        {
+            _singleInstanceMutex = null;
+        }
 
         base.OnExit(e);
     }

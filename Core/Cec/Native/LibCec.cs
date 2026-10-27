@@ -6,71 +6,6 @@ using System.Runtime.InteropServices;
 namespace BarControl.Core.Cec.Native;
 
 [StructLayout(LayoutKind.Sequential)]
-public struct CecDeviceTypeList
-{
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 5)]
-    public int[] Types;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-public struct CecLogicalAddresses
-{
-    public int Primary;
-    public ushort Addresses;
-}
-
-[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-public struct LibCecConfiguration
-{
-    public uint ClientVersion;
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 13)]
-    public string StrDeviceName;
-    public CecDeviceTypeList DeviceTypes;
-    public byte BAutodetectAddress;
-    public ushort IPhysicalAddress;
-    public int BaseDevice;
-    public byte IHDMIPort;
-    public uint TvVendor;
-    public CecLogicalAddresses WakeDevices;
-    public CecLogicalAddresses PowerOffDevices;
-    public uint ServerVersion;
-    public byte BGetSettingsFromROM;
-    public byte BActivateSource;
-    public byte BPowerOffOnStandby;
-    public IntPtr CallbackParam;
-    public IntPtr Callbacks;
-    public CecLogicalAddresses LogicalAddresses;
-    public ushort IFirmwareVersion;
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 3)]
-    public string StrDeviceLanguage;
-    public uint IFirmwareBuildDate;
-    public byte BMonitorOnly;
-    public int CecVersion;
-    public int AdapterType;
-    public int ComboKey;
-    public uint IComboKeyTimeoutMs;
-    public uint IButtonRepeatRateMs;
-    public uint IButtonReleaseDelayMs;
-    public uint IDoubleTapTimeoutMs;
-    public byte BAutoWakeAVR;
-}
-
-[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-public struct CecAdapterDescriptor
-{
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 1024)]
-    public string StrComPath;
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 1024)]
-    public string StrComName;
-    public ushort IVendorId;
-    public ushort IProductId;
-    public ushort IFirmwareVersion;
-    public ushort IPhysicalAddress;
-    public uint IFirmwareBuildDate;
-    public int AdapterType;
-}
-
-[StructLayout(LayoutKind.Sequential)]
 public struct CecCommand
 {
     public int Initiator;
@@ -142,16 +77,16 @@ public static class LibCec
     }
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void libcec_clear_configuration(ref LibCecConfiguration configuration);
+    public static extern void libcec_clear_configuration(IntPtr configuration);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern IntPtr libcec_initialise(ref LibCecConfiguration configuration);
+    public static extern IntPtr libcec_initialise(IntPtr configuration);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern void libcec_destroy(IntPtr connection);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-    public static extern sbyte libcec_detect_adapters(IntPtr connection, [Out] CecAdapterDescriptor[] deviceList, byte iBufSize, string? strDevicePath, int bQuickScan);
+    public static extern sbyte libcec_detect_adapters(IntPtr connection, IntPtr deviceList, byte iBufSize, string? strDevicePath, int bQuickScan);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
     public static extern int libcec_open(IntPtr connection, string strPort, uint iTimeout);

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,35 +44,49 @@ public class CecService : IDisposable
                 _isConnecting = true;
             }
 
+            IntPtr configPtr = Marshal.AllocHGlobal(1024);
             try
             {
-                var config = new LibCecConfiguration();
-                LibCec.libcec_clear_configuration(ref config);
+                byte[] zeros = new byte[1024];
+                Marshal.Copy(zeros, 0, configPtr, 1024);
 
-                config.ClientVersion = (4 << 16) | (0 << 8) | 2;
-                config.ServerVersion = config.ClientVersion;
-                config.StrDeviceName = "BarControl";
-                config.DeviceTypes = new CecDeviceTypeList
-                {
-                    Types = new int[] { LibCec.CEC_DEVICE_TYPE_RECORDING_DEVICE, 2, 2, 2, 2 }
-                };
-                config.BActivateSource = 0;
+                LibCec.libcec_clear_configuration(configPtr);
 
-                IntPtr conn = LibCec.libcec_initialise(ref config);
+                // clientVersion = 0x00040002
+                Marshal.WriteInt32(configPtr, 0, (4 << 16) | (0 << 8) | 2);
+
+                // strDeviceName = "BarControl" (offset 4)
+                byte[] nameBytes = Encoding.ASCII.GetBytes("BarControl\0");
+                Marshal.Copy(nameBytes, 0, configPtr + 4, nameBytes.Length);
+
+                // deviceTypes.types[0] = 1 (RECORDING_DEVICE) at offset 20
+                Marshal.WriteInt32(configPtr, 20, LibCec.CEC_DEVICE_TYPE_RECORDING_DEVICE);
+
+                IntPtr conn = LibCec.libcec_initialise(configPtr);
                 if (conn == IntPtr.Zero)
                 {
                     return;
                 }
 
-                var descriptors = new CecAdapterDescriptor[10];
-                sbyte count = LibCec.libcec_detect_adapters(conn, descriptors, 10, null, 1);
-                if (count <= 0)
+                IntPtr descBuf = Marshal.AllocHGlobal(2064 * 10);
+                string comPort = "COM6";
+                try
                 {
-                    LibCec.libcec_destroy(conn);
-                    return;
+                    sbyte count = LibCec.libcec_detect_adapters(conn, descBuf, 10, null, 1);
+                    if (count > 0)
+                    {
+                        string? detectedName = Marshal.PtrToStringAnsi(descBuf + 1024);
+                        if (!string.IsNullOrEmpty(detectedName))
+                        {
+                            comPort = detectedName;
+                        }
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(descBuf);
                 }
 
-                string comPort = descriptors[0].StrComName ?? "COM6";
                 int openResult = LibCec.libcec_open(conn, comPort, 10000);
                 if (openResult != 1)
                 {
@@ -96,6 +111,7 @@ public class CecService : IDisposable
             }
             finally
             {
+                Marshal.FreeHGlobal(configPtr);
                 lock (_lock)
                 {
                     _isConnecting = false;
