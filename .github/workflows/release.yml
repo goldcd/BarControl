@@ -1,0 +1,59 @@
+﻿name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Determine version
+      id: version
+      shell: pwsh
+      run: |
+        $rawTag = if ('${{ github.event.release.tag_name }}') {
+          '${{ github.event.release.tag_name }}'
+        } elseif ($env:GITHUB_REF -match '^refs/tags/(.*)$') {
+          $Matches[1]
+        } else {
+          ''
+        }
+
+        $cleanVersion = if ($rawTag -match '^v?(\d+\.\d+\.\d+.*)$') { $Matches[1] } else { '' }
+        $displayTag = if ($rawTag) { $rawTag } else { 'dev' }
+
+        "value=$cleanVersion" >> $env:GITHUB_OUTPUT
+        "tag=$displayTag" >> $env:GITHUB_OUTPUT
+
+    - name: Publish Single-File Executable
+      shell: pwsh
+      run: |
+        $versionArg = if ('${{ steps.version.outputs.value }}') { '-p:Version=${{ steps.version.outputs.value }}' } else { '' }
+        dotnet publish BarControl.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true $versionArg -o dist/
+
+    - name: Create or Update GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/BarControl.exe
+        tag_name: ${{ steps.version.outputs.tag }}
+        name: BarControl ${{ steps.version.outputs.tag }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
