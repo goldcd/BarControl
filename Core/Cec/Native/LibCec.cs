@@ -124,6 +124,22 @@ public static class LibCec
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern int libcec_mute_audio(IntPtr connection, int bSendRelease);
 
+    public const int CEC_USER_CONTROL_CODE_POWER = 0x40;
+    public const int CEC_USER_CONTROL_CODE_VOLUME_UP = 0x41;
+    public const int CEC_USER_CONTROL_CODE_VOLUME_DOWN = 0x42;
+    public const int CEC_USER_CONTROL_CODE_MUTE = 0x43;
+    public const int CEC_USER_CONTROL_CODE_POWER_ON_FUNCTION = 0x6D;
+    public const int CEC_USER_CONTROL_CODE_POWER_OFF_FUNCTION = 0x6C;
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int libcec_send_keypress(IntPtr connection, int iDestination, int key, int bWait);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int libcec_send_key_release(IntPtr connection, int iDestination, int bWait);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int libcec_poll_device(IntPtr connection, int iLogicalAddress);
+
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern int libcec_transmit(IntPtr connection, ref CecCommand data);
 }

@@ -449,6 +449,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
             {
                 LibCec.CEC_POWER_STATUS_ON => new SolidColorBrush(Color.FromRgb(16, 185, 129)),
                 LibCec.CEC_POWER_STATUS_STANDBY => new SolidColorBrush(Color.FromRgb(245, 158, 11)),
+                LibCec.CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON => new SolidColorBrush(Color.FromRgb(59, 130, 246)),
+                LibCec.CEC_POWER_STATUS_IN_TRANSITION_ON_TO_STANDBY => new SolidColorBrush(Color.FromRgb(239, 68, 68)),
                 _ => new SolidColorBrush(Color.FromRgb(156, 163, 175))
             };
         }
@@ -482,23 +484,56 @@ public class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _isOperatingPower;
+    public bool IsOperatingPower
+    {
+        get => _isOperatingPower;
+        set
+        {
+            if (_isOperatingPower != value)
+            {
+                _isOperatingPower = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanOperatePower));
+            }
+        }
+    }
+
+    public bool CanOperatePower => !IsOperatingPower;
+
     public async Task PowerOnSoundbarAsync()
     {
-        if (_cecService != null)
+        if (_cecService != null && !IsOperatingPower)
         {
-            await _cecService.PowerOnSoundbarAsync();
-            OnPropertyChanged(nameof(CecPowerStatusText));
-            OnPropertyChanged(nameof(CecPowerStatusBrush));
+            try
+            {
+                IsOperatingPower = true;
+                await _cecService.PowerOnSoundbarAsync();
+            }
+            finally
+            {
+                IsOperatingPower = false;
+                OnPropertyChanged(nameof(CecPowerStatusText));
+                OnPropertyChanged(nameof(CecPowerStatusBrush));
+            }
         }
     }
 
     public async Task StandbySoundbarAsync()
     {
-        if (_cecService != null)
+        if (_cecService != null && !IsOperatingPower)
         {
-            await _cecService.StandbySoundbarAsync();
-            OnPropertyChanged(nameof(CecPowerStatusText));
-            OnPropertyChanged(nameof(CecPowerStatusBrush));
+            try
+            {
+                IsOperatingPower = true;
+                await _cecService.StandbySoundbarAsync();
+            }
+            finally
+            {
+                IsOperatingPower = false;
+                OnPropertyChanged(nameof(CecPowerStatusText));
+                OnPropertyChanged(nameof(CecPowerStatusBrush));
+            }
         }
     }
 

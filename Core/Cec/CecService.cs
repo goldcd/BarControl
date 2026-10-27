@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 using BarControl.Core.Cec.Native;
+using BarControl.Core.Logging;
 
 namespace BarControl.Core.Cec;
 
@@ -62,9 +63,11 @@ public class CecService : IDisposable
                 // deviceTypes.types[0] = 1 (RECORDING_DEVICE) at offset 20
                 Marshal.WriteInt32(configPtr, 20, LibCec.CEC_DEVICE_TYPE_RECORDING_DEVICE);
 
+                LogService.LogInfo("CEC: Initializing libcec configuration...");
                 IntPtr conn = LibCec.libcec_initialise(configPtr);
                 if (conn == IntPtr.Zero)
                 {
+                    LogService.LogError("CEC: libcec_initialise returned NULL");
                     return;
                 }
 
@@ -73,6 +76,7 @@ public class CecService : IDisposable
                 try
                 {
                     sbyte count = LibCec.libcec_detect_adapters(conn, descBuf, 10, null, 1);
+                    LogService.LogInfo($"CEC: Detected {count} adapter(s)");
                     if (count > 0)
                     {
                         string? detectedName = Marshal.PtrToStringAnsi(descBuf + 1024);
@@ -82,14 +86,20 @@ public class CecService : IDisposable
                         }
                     }
                 }
+                catch (Exception ex)
+                {
+                    LogService.LogWarn($"CEC: Adapter auto-detect warning: {ex.Message}. Falling back to COM6.");
+                }
                 finally
                 {
                     Marshal.FreeHGlobal(descBuf);
                 }
 
+                LogService.LogInfo($"CEC: Opening adapter on {comPort}...");
                 int openResult = LibCec.libcec_open(conn, comPort, 10000);
                 if (openResult != 1)
                 {
+                    LogService.LogError($"CEC: libcec_open failed with code {openResult}");
                     LibCec.libcec_destroy(conn);
                     return;
                 }
@@ -100,14 +110,15 @@ public class CecService : IDisposable
                     IsConnected = true;
                     AdapterPort = comPort;
                 }
+                LogService.LogInfo($"CEC: Connected successfully on {comPort}");
 
                 // Query initial status after bus discovery settles
                 Thread.Sleep(3000);
                 RefreshDeviceInfoInternal();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Fall back gracefully if adapter or native DLL cannot be loaded
+                LogService.LogError("CEC: Error during InitializeAsync", ex);
             }
             finally
             {
@@ -127,39 +138,50 @@ public class CecService : IDisposable
 
         try
         {
-            // OSD Name
-            byte[] nameBuf = new byte[64];
-            if (LibCec.libcec_get_device_osd_name(_conn, LibCec.CECDEVICE_AUDIOSYSTEM, nameBuf) == 1)
-            {
-                string osd = Encoding.ASCII.GetString(nameBuf).TrimEnd('\0').Trim();
-                if (!string.IsNullOrEmpty(osd))
-                {
-                    SoundbarName = osd;
-                }
-            }
+            LogService.LogInfo("CEC: RefreshDeviceInfoInternal entered, querying power status...");
+            // 1. Fast: Always query power status first
+            int pwr = LibCec.libcec_get_device_power_status(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
+            PowerStatus = pwr;
+            LogService.LogInfo($"CEC: PowerStatus is {PowerStatus}");
 
-            // Vendor
-            uint vendorId = LibCec.libcec_get_device_vendor_id(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
-            byte[] vendorBuf = new byte[64];
-            LibCec.libcec_vendor_id_to_string(vendorId, vendorBuf, (UIntPtr)64);
-            string vendor = Encoding.ASCII.GetString(vendorBuf).TrimEnd('\0').Trim();
-            if (!string.IsNullOrEmpty(vendor))
-            {
-                SoundbarVendor = vendor;
-            }
-
-            // Power status
-            PowerStatus = LibCec.libcec_get_device_power_status(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
-
-            // Audio Status
+            // 2. Fast: Query audio status
             byte rawAudio = LibCec.libcec_audio_get_status(_conn);
             bool isMuted = (rawAudio & 0x80) != 0;
             int vol = rawAudio & 0x7F;
             AudioStatus = new CecAudioStatus(isMuted, vol);
+
+            LogService.LogInfo($"CEC: Status updated. Power={PowerStatus}, Vol={vol}%, Muted={isMuted}, Vendor={SoundbarVendor}, Name={SoundbarName}");
+
+            // 3. Only query OSD name if not yet resolved
+            if (SoundbarName == "HDMI Soundbar")
+            {
+                byte[] nameBuf = new byte[64];
+                if (LibCec.libcec_get_device_osd_name(_conn, LibCec.CECDEVICE_AUDIOSYSTEM, nameBuf) == 1)
+                {
+                    string osd = Encoding.ASCII.GetString(nameBuf).TrimEnd('\0').Trim();
+                    if (!string.IsNullOrEmpty(osd))
+                    {
+                        SoundbarName = osd;
+                    }
+                }
+            }
+
+            // 4. Only query Vendor if not yet resolved
+            if (SoundbarVendor == "Unknown")
+            {
+                uint vendorId = LibCec.libcec_get_device_vendor_id(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
+                byte[] vendorBuf = new byte[64];
+                LibCec.libcec_vendor_id_to_string(vendorId, vendorBuf, (UIntPtr)64);
+                string vendor = Encoding.ASCII.GetString(vendorBuf).TrimEnd('\0').Trim();
+                if (!string.IsNullOrEmpty(vendor))
+                {
+                    SoundbarVendor = vendor;
+                }
+            }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Ignore interrogation errors
+            LogService.LogError("CEC: Error querying device info", ex);
         }
     }
 
@@ -169,60 +191,44 @@ public class CecService : IDisposable
         {
             lock (_lock)
             {
-                if (_conn == IntPtr.Zero) return false;
+                if (_conn == IntPtr.Zero)
+                {
+                    LogService.LogWarn("CEC: Cannot PowerOn, adapter not connected");
+                    return false;
+                }
 
                 try
                 {
-                    // 1. User Control: POWER_ON (0x6D)
-                    var cmdOn = new CecCommand
+                    int currentPwr = LibCec.libcec_get_device_power_status(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
+                    if (currentPwr == LibCec.CEC_POWER_STATUS_ON)
                     {
-                        Initiator = LibCec.CECDEVICE_RECORDINGDEVICE1,
-                        Destination = LibCec.CECDEVICE_AUDIOSYSTEM,
-                        Opcode = LibCec.CEC_OPCODE_USER_CONTROL_PRESSED,
-                        OpcodeSet = 1,
-                        Eom = 1,
-                        TransmitTimeout = 1000,
-                        ParametersSize = 1,
-                        Parameters = new byte[] { 0x6D, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-                    };
-                    LibCec.libcec_transmit(_conn, ref cmdOn);
+                        LogService.LogInfo("CEC: Soundbar is already powered ON. Refreshing info...");
+                        PowerStatus = LibCec.CEC_POWER_STATUS_ON;
+                        RefreshDeviceInfoInternal();
+                        return true;
+                    }
 
-                    var cmdRel = new CecCommand
-                    {
-                        Initiator = LibCec.CECDEVICE_RECORDINGDEVICE1,
-                        Destination = LibCec.CECDEVICE_AUDIOSYSTEM,
-                        Opcode = LibCec.CEC_OPCODE_USER_CONTROL_RELEASE,
-                        OpcodeSet = 1,
-                        Eom = 1,
-                        TransmitTimeout = 1000,
-                        ParametersSize = 0,
-                        Parameters = new byte[16]
-                    };
-                    LibCec.libcec_transmit(_conn, ref cmdRel);
+                    LogService.LogInfo($"CEC: Waking soundbar from power state {currentPwr}...");
+                    PowerStatus = LibCec.CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON;
+                    StateChanged?.Invoke();
 
-                    // 2. System Audio Mode Request with 1.0.0.0
-                    var cmdSam = new CecCommand
-                    {
-                        Initiator = LibCec.CECDEVICE_RECORDINGDEVICE1,
-                        Destination = LibCec.CECDEVICE_AUDIOSYSTEM,
-                        Opcode = LibCec.CEC_OPCODE_SYSTEM_AUDIO_MODE_REQUEST,
-                        OpcodeSet = 1,
-                        Eom = 1,
-                        TransmitTimeout = 1000,
-                        ParametersSize = 2,
-                        Parameters = new byte[] { 0x10, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-                    };
-                    LibCec.libcec_transmit(_conn, ref cmdSam);
+                    // Send Power toggle/on keypress
+                    LibCec.libcec_send_keypress(_conn, LibCec.CECDEVICE_AUDIOSYSTEM, LibCec.CEC_USER_CONTROL_CODE_POWER, 1);
+                    LibCec.libcec_send_key_release(_conn, LibCec.CECDEVICE_AUDIOSYSTEM, 1);
 
-                    // 3. Builtin PowerOn
+                    // Also signal CEC power on devices & poll
                     LibCec.libcec_power_on_devices(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
+                    LibCec.libcec_poll_device(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
 
-                    Thread.Sleep(2000);
-                    PowerStatus = LibCec.libcec_get_device_power_status(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
+                    // Panasonic soundbars take ~3.5 seconds to boot and report status
+                    Thread.Sleep(3500);
+                    RefreshDeviceInfoInternal();
+                    LogService.LogInfo($"CEC: Post-wake power status: {PowerStatus}");
                     return PowerStatus == LibCec.CEC_POWER_STATUS_ON;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    LogService.LogError("CEC: Exception during PowerOnSoundbarAsync", ex);
                     return false;
                 }
                 finally
@@ -239,17 +245,44 @@ public class CecService : IDisposable
         {
             lock (_lock)
             {
-                if (_conn == IntPtr.Zero) return false;
+                if (_conn == IntPtr.Zero)
+                {
+                    LogService.LogWarn("CEC: Cannot Standby, adapter not connected");
+                    return false;
+                }
 
                 try
                 {
-                    int res = LibCec.libcec_standby_devices(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
-                    Thread.Sleep(1500);
-                    PowerStatus = LibCec.libcec_get_device_power_status(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
-                    return res == 1;
+                    int currentPwr = LibCec.libcec_get_device_power_status(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
+                    if (currentPwr == LibCec.CEC_POWER_STATUS_STANDBY)
+                    {
+                        LogService.LogInfo("CEC: Soundbar is already in STANDBY. Refreshing info...");
+                        PowerStatus = LibCec.CEC_POWER_STATUS_STANDBY;
+                        RefreshDeviceInfoInternal();
+                        return true;
+                    }
+
+                    LogService.LogInfo($"CEC: Putting soundbar into standby from power state {currentPwr}...");
+                    PowerStatus = LibCec.CEC_POWER_STATUS_IN_TRANSITION_ON_TO_STANDBY;
+                    StateChanged?.Invoke();
+
+                    // 1. Send Power keypress
+                    LibCec.libcec_send_keypress(_conn, LibCec.CECDEVICE_AUDIOSYSTEM, LibCec.CEC_USER_CONTROL_CODE_POWER, 1);
+                    LibCec.libcec_send_key_release(_conn, LibCec.CECDEVICE_AUDIOSYSTEM, 1);
+
+                    // 2. Also send CEC Standby command to device and broadcast
+                    LibCec.libcec_standby_devices(_conn, LibCec.CECDEVICE_AUDIOSYSTEM);
+                    LibCec.libcec_standby_devices(_conn, LibCec.CECDEVICE_BROADCAST);
+
+                    // Wait 3.5 seconds for relay shutdown
+                    Thread.Sleep(3500);
+                    RefreshDeviceInfoInternal();
+                    LogService.LogInfo($"CEC: Post-standby power status: {PowerStatus}");
+                    return true;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    LogService.LogError("CEC: Exception during StandbySoundbarAsync", ex);
                     return false;
                 }
                 finally

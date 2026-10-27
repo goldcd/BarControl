@@ -10,6 +10,8 @@ using BarControl.Core.Startup;
 using BarControl.Core.Tray;
 using BarControl.UI;
 
+using BarControl.Core.Logging;
+
 namespace BarControl;
 
 public partial class App : Application
@@ -27,6 +29,24 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Setup global unhandled exception logging
+        AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+        {
+            LogService.LogError("App: AppDomain Unhandled Exception", args.ExceptionObject as Exception);
+        };
+        DispatcherUnhandledException += (s, args) =>
+        {
+            LogService.LogError("App: Dispatcher Unhandled Exception", args.Exception);
+            args.Handled = true; // prevent immediate fatal crash if recoverable
+        };
+        TaskScheduler.UnobservedTaskException += (s, args) =>
+        {
+            LogService.LogError("App: Unobserved Task Exception", args.Exception);
+            args.SetObserved();
+        };
+
+        LogService.LogInfo($"=== BarControl Starting (PID {Environment.ProcessId}) ===");
 
         // Keep Windows uninstaller registration version synced with current running app
         StartupService.SyncInstalledAppVersion();
@@ -54,7 +74,7 @@ public partial class App : Application
         _mainWindow = new MainWindow(_viewModel);
 
         _trayService.OnOpenRequested += ShowMainWindow;
-        _trayService.OnExitRequested += ShutdownApplication;
+        _trayService.OnExitRequested += () => Dispatcher.InvokeAsync(ShutdownApplication);
 
         // Start window relocation engine hooks
         _engine.Start();
@@ -102,31 +122,47 @@ public partial class App : Application
         _mainWindow.Focus();
     }
 
-
     private void ShutdownApplication()
     {
-        _mainWindow?.RequestExplicitExit();
-        _cecService?.Dispose();
-        _audioService?.Dispose();
-        _engine?.Dispose();
-        _trayService?.Dispose();
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.InvokeAsync(ShutdownApplication);
+            return;
+        }
 
         try
         {
-            _singleInstanceMutex?.ReleaseMutex();
-            _singleInstanceMutex?.Dispose();
+            LogService.LogInfo("App: Shutdown requested from Tray or User");
+            _mainWindow?.RequestExplicitExit();
+            _cecService?.Dispose();
+            _audioService?.Dispose();
+            _engine?.Dispose();
+            _trayService?.Dispose();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            LogService.LogError("App: Exception during ShutdownApplication", ex);
+        }
         finally
         {
-            _singleInstanceMutex = null;
-        }
+            try
+            {
+                _singleInstanceMutex?.ReleaseMutex();
+                _singleInstanceMutex?.Dispose();
+            }
+            catch { }
+            finally
+            {
+                _singleInstanceMutex = null;
+            }
 
-        Shutdown();
+            Shutdown();
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        LogService.LogInfo("App: OnExit triggered");
         _cecService?.Dispose();
         _engine?.Dispose();
         _trayService?.Dispose();
