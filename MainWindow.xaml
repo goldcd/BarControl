@@ -1,16 +1,16 @@
-﻿<Window x:Class="BarControl.MainWindow"
+<Window x:Class="BarControl.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="clr-namespace:BarControl.UI"
         mc:Ignorable="d"
-        Title="BarControl - Not on That Monitor"
+        Title="BarControl - Soundbar &amp; HDMI-CEC Control"
         Icon="pack://application:,,,/Assets/app.ico"
-        Height="760" Width="940"
-        MinHeight="660" MinWidth="840"
+        Height="630" Width="680"
+        MinHeight="540" MinWidth="580"
         WindowStartupLocation="CenterScreen"
-        Background="#1C1C1F"
+        Background="#161618"
         Foreground="#EDEDED"
         FontFamily="Segoe UI, Inter, Roboto, Arial"
         UseLayoutRounding="True"
@@ -19,12 +19,12 @@
     <Window.Resources>
         <!-- Windows 11 Fluent Button Styles -->
         <Style x:Key="ActionButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#2A2A2E"/>
+            <Setter Property="Background" Value="#26262B"/>
             <Setter Property="Foreground" Value="#EDEDED"/>
-            <Setter Property="BorderBrush" Value="#3E3E46"/>
+            <Setter Property="BorderBrush" Value="#383840"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="14,7"/>
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
@@ -40,11 +40,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="btnBorder" Property="Background" Value="#383840"/>
-                                <Setter TargetName="btnBorder" Property="BorderBrush" Value="#555560"/>
+                                <Setter TargetName="btnBorder" Property="Background" Value="#32323A"/>
+                                <Setter TargetName="btnBorder" Property="BorderBrush" Value="#4C4C58"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="btnBorder" Property="Background" Value="#222226"/>
+                                <Setter TargetName="btnBorder" Property="Background" Value="#1C1C20"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="btnBorder" Property="Opacity" Value="0.45"/>
@@ -84,10 +84,10 @@
             </Setter>
         </Style>
 
-        <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
-            <Setter Property="Background" Value="#3B1C1D"/>
-            <Setter Property="BorderBrush" Value="#662628"/>
-            <Setter Property="Foreground" Value="#F87171"/>
+        <Style x:Key="AmberButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#3B2E15"/>
+            <Setter Property="BorderBrush" Value="#665022"/>
+            <Setter Property="Foreground" Value="#FBBF24"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -101,9 +101,8 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="btnBorder" Property="Background" Value="#542325"/>
-                                <Setter TargetName="btnBorder" Property="BorderBrush" Value="#822E31"/>
-                                <Setter TargetName="btnBorder" Property="TextElement.Foreground" Value="#FFAAAA"/>
+                                <Setter TargetName="btnBorder" Property="Background" Value="#523E1A"/>
+                                <Setter TargetName="btnBorder" Property="BorderBrush" Value="#806328"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -111,90 +110,51 @@
             </Setter>
         </Style>
 
-        <Style x:Key="SuccessButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
-            <Setter Property="Background" Value="#143628"/>
-            <Setter Property="BorderBrush" Value="#1E543E"/>
-            <Setter Property="Foreground" Value="#34D399"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="btnBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="btnBorder" Property="Background" Value="#1B4734"/>
-                                <Setter TargetName="btnBorder" Property="BorderBrush" Value="#286E52"/>
-                                <Setter TargetName="btnBorder" Property="TextElement.Foreground" Value="#AAFFD0"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <!-- Custom Dark Fluent ComboBox Style -->
+        <Style x:Key="DarkComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="#26262B"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#383840"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
         </Style>
     </Window.Resources>
 
-    <Grid Margin="22,18,22,18">
+    <Grid Margin="20,16,20,16">
         <Grid.RowDefinitions>
-            <!-- 0: Minimal Header (Clean BarControl Brand + Interactive Guard Toggle + Options) -->
+            <!-- 0: Header -->
             <RowDefinition Height="Auto"/>
-            <!-- 1: Displays Topology Canvas (Expands with Window) -->
+            <!-- 1: Soundbar Device Selection -->
+            <RowDefinition Height="Auto"/>
+            <!-- 2: Scrollable Features List -->
             <RowDefinition Height="*"/>
-            <!-- 2: Selected Display Configuration Card -->
-            <RowDefinition Height="Auto"/>
-            <!-- 3: Subtle Footer Bar (Version & Update Notice) -->
+            <!-- 3: Footer -->
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- ================= 0: CLEAN HEADER BAR ================= -->
-        <Border Grid.Row="0" Margin="0,0,0,16" Padding="0,0,0,14" BorderBrush="#2A2A2E" BorderThickness="0,0,0,1">
+        <!-- ================= 0: HEADER BAR ================= -->
+        <Border Grid.Row="0" Margin="0,0,0,16" Padding="0,0,0,12" BorderBrush="#25252A" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: App Icon, Brand Title and Clickable Guard Toggle Button -->
+                <!-- Left: App Icon & Brand -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Option 4 Vector App Icon -->
-                    <Grid Width="28" Height="28" Margin="0,0,10,0" VerticalAlignment="Center">
-                        <!-- Monitor Frame -->
-                        <Border Width="24" Height="16" Margin="0,0,0,6"
-                                Background="#181A20"
-                                BorderBrush="#F1F5F9"
-                                BorderThickness="1.8"
-                                CornerRadius="2.5"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Top"/>
-                        <!-- Stand Neck -->
-                        <Rectangle Width="2" Height="5" Fill="#F1F5F9" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,2"/>
-                        <!-- Stand Foot -->
-                        <Rectangle Width="12" Height="1.8" RadiusX="0.9" RadiusY="0.9" Fill="#F1F5F9" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
-                        <!-- Diagonal Ban Slash (Option 4) with contrast halo -->
-                        <Line X1="1" Y1="25" X2="27" Y2="3" Stroke="#0F1117" StrokeThickness="4.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                        <Line X1="1" Y1="25" X2="27" Y2="3" Stroke="#EF4444" StrokeThickness="2.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                    </Grid>
+                    <!-- Icon -->
+                    <Border Width="26" Height="26" Margin="0,0,10,0" Background="#0078D4" CornerRadius="6" VerticalAlignment="Center">
+                        <TextBlock Text="🔊" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="BarControl"
-                                   FontSize="19"
-                                   FontWeight="Bold"
-                                   Foreground="White"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Text="— Not on That Monitor"
-                                   FontSize="13"
-                                   FontWeight="SemiBold"
-                                   Foreground="#94A3B8"
-                                   VerticalAlignment="Center"
-                                   Margin="6,1,0,0"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
+                        <TextBlock Text="BarControl" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBlock Text="— Soundbar &amp; CEC" FontSize="13" FontWeight="SemiBold" Foreground="#8E8E98" VerticalAlignment="Center" Margin="6,2,0,0"/>
                     </StackPanel>
 
-                    <!-- Requirement 4: Guard Status Graphic acts directly as the toggle button -->
+                    <!-- Guard Status Button -->
                     <Button Click="OnToggleGuardClicked"
                             Cursor="Hand"
                             Background="Transparent"
@@ -209,9 +169,9 @@
                                         Padding="10,4"
                                         VerticalAlignment="Center">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Ellipse Width="7" Height="7" Fill="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <Ellipse Width="6" Height="6" Fill="White" Margin="0,0,5,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{Binding StatusText, FallbackValue='GUARD ACTIVE'}"
-                                                   FontSize="11"
+                                                   FontSize="10.5"
                                                    FontWeight="Bold"
                                                    Foreground="White"
                                                    VerticalAlignment="Center"/>
@@ -227,321 +187,315 @@
                     </Button>
                 </StackPanel>
 
-                <!-- Right: Application Settings & Sweep Action -->
+                <!-- Right: Options -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <!-- Start with Windows -->
                     <CheckBox Content="Start with Windows"
                               IsChecked="{Binding StartWithWindows}"
-                              Foreground="#A1A1AA"
-                              FontSize="12"
-                              Margin="0,0,16,0"
+                              Foreground="#9E9EA6"
+                              FontSize="11.5"
+                              Margin="0,0,14,0"
                               VerticalAlignment="Center"
                               Cursor="Hand"/>
 
-                    <!-- Start Minimized -->
                     <CheckBox Content="Start Minimized"
                               IsChecked="{Binding StartMinimized}"
-                              Foreground="#A1A1AA"
-                              FontSize="12"
-                              Margin="0,0,16,0"
+                              Foreground="#9E9EA6"
+                              FontSize="11.5"
                               VerticalAlignment="Center"
                               Cursor="Hand"/>
-
-                    <!-- Notifications -->
-                    <CheckBox Content="Notifications"
-                              IsChecked="{Binding ShowNotifications}"
-                              Foreground="#A1A1AA"
-                              FontSize="12"
-                              Margin="0,0,16,0"
-                              VerticalAlignment="Center"
-                              Cursor="Hand"/>
-
-                    <!-- Sweep Button -->
-                    <Button Content="⚡ Sweep"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Click="OnSweepClicked"
-                            Padding="12,5"
-                            ToolTip="Move any off-limits window back to primary display now"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- ================= 1: WINDOWS 11 "SYSTEM > DISPLAY" TOPOLOGY ================= -->
+        <!-- ================= 1: SOUNDBAR SELECTION DROPDOWN ================= -->
         <Border Grid.Row="1"
-                Background="#232327"
-                BorderBrush="#333338"
+                Background="#1E1E22"
+                BorderBrush="#2C2C32"
                 BorderThickness="1"
-                CornerRadius="10"
+                CornerRadius="8"
                 Padding="16,14"
-                Margin="0,0,0,16">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <!-- Header -->
-                <Grid Grid.Row="0" Margin="0,0,0,10">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Displays" FontSize="15" FontWeight="SemiBold" Foreground="White" Margin="0,0,8,0"/>
-                        <TextBlock Text="• Select a display to configure its role" FontSize="12" Foreground="#82828C" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Grid>
-
-                <!-- Interactive Display Topology Canvas -->
-                <ui:MonitorVisualMap x:Name="MonitorMap"
-                                     Grid.Row="1"
-                                     MinHeight="180"
-                                     DisplaysSource="{Binding Displays}"
-                                     SelectedDisplay="{Binding SelectedDisplay, Mode=TwoWay}"
-                                     Margin="0,0,0,12"/>
-
-                <!-- Action Row underneath Canvas (Identify Displays Button) -->
-                <Grid Grid.Row="2">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="👁 Identify Displays"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Padding="14,6"
-                                Margin="0,0,14,0"
-                                Click="OnIdentifyAllClicked"
-                                ToolTip="Flash large display numbers onto all connected monitors"/>
-
-                        <TextBlock Text="Numbers on screen correspond to the display boxes above."
-                                   FontSize="12"
-                                   Foreground="#71717A"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Grid>
-            </Grid>
-        </Border>
-
-        <!-- ================= 2: SELECTED DISPLAY CONFIGURATION CARD ================= -->
-        <Border Grid.Row="2"
-                Background="#232327"
-                BorderBrush="#333338"
-                BorderThickness="1"
-                CornerRadius="10"
-                Padding="16,14">
+                Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Display Title & Specs Header -->
-                <Grid Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Grid.Row="0"
+                           Text="SELECT SOUNDBAR / HDMI AUDIO DEVICE"
+                           FontSize="11"
+                           FontWeight="Bold"
+                           Foreground="#8E8E98"
+                           Margin="0,0,0,8"/>
+
+                <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Selected Monitor Index Badge -->
-                    <Border Grid.Column="0"
-                            Width="34" Height="34"
-                            CornerRadius="6"
-                            Background="#333338"
-                            Margin="0,0,12,0"
-                            VerticalAlignment="Center">
-                        <TextBlock Text="{Binding SelectedDisplay.Index, FallbackValue='1'}"
-                                   FontWeight="Bold"
-                                   FontSize="16"
-                                   Foreground="White"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"/>
-                    </Border>
+                    <ComboBox Grid.Column="0"
+                              ItemsSource="{Binding Displays}"
+                              SelectedItem="{Binding SelectedSoundbar, Mode=TwoWay}"
+                              Style="{StaticResource DarkComboBoxStyle}"
+                              VerticalAlignment="Center">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Margin="2,3">
+                                    <TextBlock Text="🔊" FontSize="13" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
+                                            <TextBlock Text=" (Soundbar)" Foreground="#10B981" FontWeight="SemiBold" FontSize="11" Margin="6,1,0,0"
+                                                       Visibility="{Binding HasAudioEndpoint, Converter={x:Static ui:BooleanToVisibilityConverter.Instance}}"/>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="#8E8E98"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
 
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding SelectedDisplay.DisplayTitle, FallbackValue='Select a display'}"
-                                       FontSize="16"
-                                       FontWeight="Bold"
-                                       Foreground="White"
-                                       Margin="0,0,10,0"/>
-                            <!-- Status Badge -->
-                            <Border Background="#2E2E33"
-                                    BorderBrush="{Binding SelectedDisplay.StatusBadgeBackground, FallbackValue=#444}"
-                                    BorderThickness="1"
-                                    CornerRadius="5"
-                                    Padding="8,2"
+                    <Button Grid.Column="1"
+                            Content="🔄 Rescan"
+                            Style="{StaticResource ActionButtonStyle}"
+                            Margin="10,0,0,0"
+                            Padding="12,7"
+                            Click="OnRefreshClicked"
+                            ToolTip="Rescan connected HDMI displays and audio endpoints"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- ================= 2: SOUNDBAR FEATURES LIST ================= -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,12">
+            <StackPanel>
+                <!-- FEATURE CARD 1: HDMI-CEC POWER MANAGEMENT -->
+                <Border Background="#1E1E22"
+                        BorderBrush="#2C2C32"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="16,14"
+                        Margin="0,0,0,12">
+                    <StackPanel>
+                        <!-- Card Header -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="⚡" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="HDMI-CEC Power Management" FontSize="14.5" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Live Power Status Badge -->
+                            <Border Grid.Column="1"
+                                    Background="{Binding CecPowerStatusBrush}"
+                                    CornerRadius="10"
+                                    Padding="10,3"
                                     VerticalAlignment="Center">
-                                <TextBlock Text="{Binding SelectedDisplay.StatusDescription, FallbackValue='ALLOWED'}"
+                                <TextBlock Text="{Binding CecPowerStatusText}"
                                            FontSize="10.5"
                                            FontWeight="Bold"
                                            Foreground="White"/>
                             </Border>
-                        </StackPanel>
-                        <TextBlock Text="{Binding SelectedDisplay.Subtitle, FallbackValue=''}"
-                                   FontSize="11.5"
-                                   Foreground="#9E9EA6"
-                                   Margin="0,2,0,0"/>
-                    </StackPanel>
-
-                    <!-- Identify Single Display Button -->
-                    <Button Grid.Column="2"
-                            Content="Identify This Screen"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Padding="12,5"
-                            FontSize="12"
-                            Click="OnIdentifySelectedClicked"
-                            VerticalAlignment="Center"/>
-                </Grid>
-
-                <!-- Option Rows for Selected Display -->
-                <Border Grid.Row="1" Background="#1D1D21" BorderBrush="#2A2A2E" BorderThickness="1" CornerRadius="8" Padding="12,10">
-                    <StackPanel>
-                        <!-- Options Grid -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="14"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Primary Target Option -->
-                            <Border Grid.Column="0" Background="#26262B" BorderBrush="#333338" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Primary Target Display" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
-                                        <TextBlock Text="All windows from blocked monitors will be redirected here."
-                                                   FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                    </StackPanel>
-
-                                    <!-- Requirement 3: Enabled ONLY if this BarControl app is currently on this display -->
-                                    <Button Grid.Column="1"
-                                            Content="{Binding SelectedDisplay.IsTargetPrimary, Converter={x:Static ui:PrimaryButtonTextConverter.Instance}}"
-                                            Style="{StaticResource ActionButtonStyle}"
-                                            IsEnabled="{Binding CanSetSelectedAsPrimary}"
-                                            ToolTip="{Binding PrimaryButtonToolTip}"
-                                            Click="OnSetSelectedAsPrimaryClicked"
-                                            VerticalAlignment="Center"/>
-                                </Grid>
-                            </Border>
-
-                            <!-- Block/Allow Toggle Option -->
-                            <Border Grid.Column="2" Background="#26262B" BorderBrush="#333338" BorderThickness="1" CornerRadius="6" Padding="12,10">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="Block Display (Not in Use)" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
-                                        <TextBlock Text="Prevent applications from using this screen (audio remains active)."
-                                                   FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                    </StackPanel>
-
-                                    <Button Grid.Column="1"
-                                            Content="{Binding SelectedDisplay.IsExcluded, Converter={x:Static ui:BlockButtonTextConverter.Instance}}"
-                                            Style="{Binding SelectedDisplay.IsExcluded, Converter={x:Static ui:BlockButtonStyleConverter.Instance}}"
-                                            Click="OnToggleSelectedBlockClicked"
-                                            VerticalAlignment="Center"/>
-                                </Grid>
-                            </Border>
                         </Grid>
 
-                        <!-- Audio Keep-Alive Option (Only visible when monitor has an associated audio output) -->
-                        <Border Background="#26262B"
-                                BorderBrush="#333338"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="12,10"
-                                Margin="0,10,0,0"
-                                Visibility="{Binding SelectedDisplay.HasAudioEndpoint, Converter={x:Static ui:BooleanToVisibilityConverter.Instance}}">
+                        <!-- Hardware / Connection Details Bar -->
+                        <Border Background="#17171A" CornerRadius="6" Padding="12,7" Margin="0,0,0,12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Speaker Icon Badge -->
-                                <Border Grid.Column="0"
-                                        Width="30" Height="30"
-                                        CornerRadius="6"
-                                        Background="#1E293B"
-                                        BorderBrush="#334155"
-                                        BorderThickness="1"
-                                        Margin="0,0,12,0"
-                                        VerticalAlignment="Center">
-                                    <TextBlock Text="🔊" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Adapter:" FontSize="11.5" Foreground="#71717A" Margin="0,0,4,0"/>
+                                    <TextBlock Text="Pulse-Eight USB-CEC" FontSize="11.5" FontWeight="SemiBold" Foreground="#EDEDED" Margin="0,0,6,0"/>
+                                    <TextBlock Text="(" FontSize="11.5" Foreground="#71717A"/>
+                                    <TextBlock Text="{Binding CecPortName}" FontSize="11.5" Foreground="#A1A1AA"/>
+                                    <TextBlock Text=")" FontSize="11.5" Foreground="#71717A" Margin="0,0,10,0"/>
 
-                                <!-- Description & Connected Audio Device -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="Keep Audio Alive" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="0,0,8,0"/>
-                                        <Border Background="#143628" BorderBrush="#1E543E" BorderThickness="1" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
-                                            <TextBlock Text="HDMI Audio" FontSize="10" FontWeight="SemiBold" Foreground="#34D399"/>
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="{Binding SelectedDisplay.AudioEndpointSubtitle, FallbackValue='Prevents HDMI soundbar from sleeping'}"
+                                    <TextBlock Text="• Device:" FontSize="11.5" Foreground="#71717A" Margin="0,0,4,0"/>
+                                    <TextBlock Text="{Binding SoundbarVendor}" FontSize="11.5" Foreground="#A1A1AA" Margin="0,0,4,0"/>
+                                    <TextBlock Text="{Binding SoundbarCecName}" FontSize="11.5" FontWeight="SemiBold" Foreground="#EDEDED"/>
+                                </StackPanel>
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding CecVolumeText}"
+                                           FontSize="11.5"
+                                           FontWeight="SemiBold"
+                                           Foreground="#34D399"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Checkbox Option 1: Standby & Wake Sync -->
+                        <Border Background="#25252A" CornerRadius="6" Padding="12,10" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Auto-Power Sync (Sleep / Wake)" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock Text="Turn soundbar off when PC enters standby, and wake it up when PC wakes up."
                                                FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                 </StackPanel>
 
-                                <!-- Clean, compact toggle CheckBox -->
-                                <CheckBox Grid.Column="2"
-                                          IsChecked="{Binding SelectedDisplay.KeepAudioAlive}"
-                                          Foreground="#E2E8F0"
-                                          FontSize="12"
+                                <CheckBox Grid.Column="1"
+                                          IsChecked="{Binding IsPowerSyncEnabled}"
                                           VerticalAlignment="Center"
-                                          Cursor="Hand"
-                                          Content="Enabled"
-                                          ToolTip="Sends inaudible sub-bit WASAPI pulses directly to this soundbar/monitor to prevent standby without waking any other devices (Inspired by SoundKeeper by vrubleg)"/>
+                                          Cursor="Hand"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Manual Power Control Buttons -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Button Grid.Column="0"
+                                    Content="⚡ Power On"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="OnPowerOnClicked"
+                                    ToolTip="Send CEC power on sequence to soundbar now"/>
+
+                            <Button Grid.Column="2"
+                                    Content="🌙 Standby (Off)"
+                                    Style="{StaticResource AmberButtonStyle}"
+                                    Click="OnStandbyClicked"
+                                    ToolTip="Send CEC standby command to soundbar now"/>
+
+                            <Button Grid.Column="4"
+                                    Content="🔄 Refresh Status"
+                                    Style="{StaticResource ActionButtonStyle}"
+                                    Click="OnRefreshCecClicked"
+                                    ToolTip="Poll soundbar power and volume status over CEC"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- FEATURE CARD 2: PHANTOM DISPLAY GUARD & AUDIO KEEP-ALIVE -->
+                <Border Background="#1E1E22"
+                        BorderBrush="#2C2C32"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="16,14"
+                        Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="🛡 Audio &amp; Phantom Display Guarding" FontSize="14.5" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+
+                        <!-- Option: Phantom Display Guard -->
+                        <Border Background="#25252A" CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Phantom Display Guard" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock Text="Prevent windows and cursors from getting lost on this soundbar display (audio continues)."
+                                               FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                </StackPanel>
+
+                                <CheckBox Grid.Column="1"
+                                          IsChecked="{Binding IsPhantomDisplayGuardEnabled}"
+                                          VerticalAlignment="Center"
+                                          Cursor="Hand"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Option: Audio Keep-Alive -->
+                        <Border Background="#25252A" CornerRadius="6" Padding="12,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Continuous Audio Keep-Alive" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock Text="Streams an inaudible signal to prevent soundbar sleep and audio cut-off/clipping."
+                                               FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                </StackPanel>
+
+                                <CheckBox Grid.Column="1"
+                                          IsChecked="{Binding IsAudioKeepAliveEnabled}"
+                                          VerticalAlignment="Center"
+                                          Cursor="Hand"/>
                             </Grid>
                         </Border>
                     </StackPanel>
                 </Border>
+
+                <!-- FEATURE CARD 3: DOLBY ATMOS & BITSTREAM VOLUME BRIDGE PREVIEW -->
+                <Border Background="#1A1A1E"
+                        BorderBrush="#26262B"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="16,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="🎵" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Dolby Atmos / Bitstream CEC Volume Proxy" FontSize="13" FontWeight="SemiBold" Foreground="#D4D4D8"/>
+                            </StackPanel>
+                            <TextBlock Text="Proxies Windows volume controls via HDMI-CEC when streaming Atmos or DTS direct audio."
+                                       FontSize="11" Foreground="#71717A" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                        </StackPanel>
+
+                        <Border Grid.Column="1"
+                                Background="#2A2A30"
+                                CornerRadius="5"
+                                Padding="8,3"
+                                VerticalAlignment="Center">
+                            <TextBlock Text="Next Feature" FontSize="10" FontWeight="SemiBold" Foreground="#A1A1AA"/>
+                        </Border>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ================= 3: FOOTER BAR ================= -->
+        <Border Grid.Row="3" Padding="0,8,0,0" BorderBrush="#25252A" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: App Version & Status -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="BarControl " FontSize="11" Foreground="#71717A"/>
+                    <TextBlock Text="{Binding AppVersion}" FontSize="11" Foreground="#A1A1AA"/>
+                    <TextBlock Text=" • Pulse-Eight HDMI-CEC Ready" FontSize="11" Foreground="#52525B" Margin="6,0,0,0"/>
+                </StackPanel>
+
+                <!-- Right: Sweep button -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="⚡ Sweep Windows"
+                            Style="{StaticResource ActionButtonStyle}"
+                            Click="OnSweepClicked"
+                            Padding="10,4"
+                            FontSize="11.5"
+                            ToolTip="Instantly pull any off-limits window back to primary monitor"/>
+                </StackPanel>
             </Grid>
         </Border>
-
-        <!-- ================= 3: SUBTLE FOOTER BAR ================= -->
-        <Grid Grid.Row="3" Margin="2,8,2,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Left: Update notification & one-click action (only visible if an update is available) -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
-                        Visibility="{Binding IsUpdateAvailable, Converter={x:Static ui:BooleanToVisibilityConverter.Instance}}">
-                <Border Background="#1E293B" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
-                    <TextBlock Text="UPDATE" FontSize="9.5" FontWeight="Bold" Foreground="#60A5FA"/>
-                </Border>
-                <TextBlock Text="New version available: " FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding AvailableUpdateVersion}" FontSize="11" FontWeight="SemiBold" Foreground="#F1F5F9" VerticalAlignment="Center" Margin="0,0,10,0"/>
-
-                <Button Content="{Binding UpdateButtonText}"
-                        Click="OnApplyUpdateClicked"
-                        IsEnabled="{Binding IsDownloadingUpdate, Converter={x:Static ui:InverseBooleanConverter.Instance}}"
-                        Background="#2563EB" Foreground="White" BorderThickness="0"
-                        Padding="10,3" FontSize="11" FontWeight="SemiBold" Cursor="Hand"
-                        VerticalAlignment="Center">
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                        </ControlTemplate>
-                    </Button.Template>
-                </Button>
-            </StackPanel>
-
-            <!-- Right: Small subtle version number -->
-            <TextBlock Grid.Column="1"
-                       Text="{Binding AppVersion}"
-                       FontSize="11"
-                       Foreground="#64748B"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Right"
-                       ToolTip="Current running version"/>
-        </Grid>
     </Grid>
 </Window>

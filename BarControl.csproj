@@ -27,4 +27,8 @@
     <Resource Include="Assets\app.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="runtimes\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

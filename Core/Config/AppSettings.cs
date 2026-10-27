@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace BarControl.Core.Config;
 
@@ -15,4 +15,8 @@ public class AppSettings
     public List<string> DisabledAudioKeepAliveMonitors { get; set; } = new();
     public bool ShowNotificationOnRelocate { get; set; } = true;
     public int SweepIntervalMs { get; set; } = 1000;
+
+    // HDMI-CEC Settings
+    public bool CecPowerSyncEnabled { get; set; } = true;
+    public string? SelectedSoundbarIdentifier { get; set; }
 }

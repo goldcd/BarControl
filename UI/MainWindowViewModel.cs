@@ -1,10 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using BarControl.Core.Audio;
+using BarControl.Core.Cec;
+using BarControl.Core.Cec.Native;
 using BarControl.Core.Config;
 using BarControl.Core.Display;
 using BarControl.Core.Engine;
@@ -21,6 +23,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly WindowRelocationEngine _engine;
     private readonly TrayIconService _trayService;
+    private readonly AudioKeepAliveService? _audioService;
+    private readonly CecService? _cecService;
     private AppSettings _settings;
 
     private bool _isGuardActive = true;
@@ -307,18 +311,23 @@ public class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    private readonly AudioKeepAliveService? _audioService;
-
-    public MainWindowViewModel(WindowRelocationEngine engine, TrayIconService trayService, AudioKeepAliveService? audioService = null)
+    public MainWindowViewModel(WindowRelocationEngine engine, TrayIconService trayService, AudioKeepAliveService? audioService = null, CecService? cecService = null)
     {
         _engine = engine;
         _trayService = trayService;
         _audioService = audioService;
+        _cecService = cecService;
         _settings = ConfigService.Load();
 
         if (_audioService != null)
         {
             _audioService.IsEnabled = _settings.KeepAudioAwake;
+        }
+
+        if (_cecService != null)
+        {
+            _cecService.AutoPowerSyncEnabled = _settings.CecPowerSyncEnabled;
+            _cecService.StateChanged += OnCecStateChanged;
         }
 
         _isGuardActive = _settings.IsGuardEnabled;
@@ -336,6 +345,170 @@ public class MainWindowViewModel : INotifyPropertyChanged
             await Task.Delay(2000);
             await CheckForUpdatesAsync();
         });
+    }
+
+    private void OnCecStateChanged()
+    {
+        Application.Current?.Dispatcher.InvokeAsync(() =>
+        {
+            OnPropertyChanged(nameof(IsCecConnected));
+            OnPropertyChanged(nameof(CecPortName));
+            OnPropertyChanged(nameof(SoundbarCecName));
+            OnPropertyChanged(nameof(SoundbarVendor));
+            OnPropertyChanged(nameof(CecPowerStatusText));
+            OnPropertyChanged(nameof(CecPowerStatusBrush));
+            OnPropertyChanged(nameof(CecVolumeText));
+        });
+    }
+
+    private DisplayInfo? _selectedSoundbar;
+    public DisplayInfo? SelectedSoundbar
+    {
+        get => _selectedSoundbar;
+        set
+        {
+            if (_selectedSoundbar != value)
+            {
+                _selectedSoundbar = value;
+                SelectedDisplay = value;
+                if (value != null)
+                {
+                    _settings.SelectedSoundbarIdentifier = !string.IsNullOrEmpty(value.HardwareId) ? value.HardwareId : value.FriendlyName;
+                    SaveSettings();
+                }
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsPhantomDisplayGuardEnabled));
+                OnPropertyChanged(nameof(IsAudioKeepAliveEnabled));
+            }
+        }
+    }
+
+    public bool IsPhantomDisplayGuardEnabled
+    {
+        get => SelectedSoundbar?.IsExcluded ?? false;
+        set
+        {
+            if (SelectedSoundbar != null && SelectedSoundbar.IsExcluded != value)
+            {
+                SelectedSoundbar.IsExcluded = value;
+                if (value && SelectedSoundbar.IsTargetPrimary)
+                {
+                    SelectedSoundbar.IsTargetPrimary = false;
+                    EnsureValidTargetPrimary();
+                }
+                UpdateExcludedSettingsList();
+                SyncConfiguration();
+                SaveSettings();
+                OnPropertyChanged();
+                if (value) SweepNow();
+            }
+        }
+    }
+
+    public bool IsAudioKeepAliveEnabled
+    {
+        get => SelectedSoundbar?.KeepAudioAlive ?? false;
+        set
+        {
+            if (SelectedSoundbar != null && SelectedSoundbar.KeepAudioAlive != value)
+            {
+                SelectedSoundbar.KeepAudioAlive = value;
+                OnDisplayAudioSettingChanged(SelectedSoundbar);
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsCecConnected => _cecService?.IsConnected ?? false;
+    public string CecPortName => _cecService?.AdapterPort ?? "COM6";
+    public string SoundbarCecName => _cecService?.SoundbarName ?? "Audio";
+    public string SoundbarVendor => _cecService?.SoundbarVendor ?? "Panasonic";
+
+    public string CecPowerStatusText
+    {
+        get
+        {
+            if (_cecService == null || !_cecService.IsConnected) return "SEARCHING FOR ADAPTER...";
+            return _cecService.PowerStatus switch
+            {
+                LibCec.CEC_POWER_STATUS_ON => "POWERED ON",
+                LibCec.CEC_POWER_STATUS_STANDBY => "STANDBY",
+                LibCec.CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON => "POWERING ON...",
+                LibCec.CEC_POWER_STATUS_IN_TRANSITION_ON_TO_STANDBY => "ENTERING STANDBY...",
+                _ => "UNKNOWN / SLEEP"
+            };
+        }
+    }
+
+    public Brush CecPowerStatusBrush
+    {
+        get
+        {
+            if (_cecService == null || !_cecService.IsConnected) return new SolidColorBrush(Color.FromRgb(113, 113, 122));
+            return _cecService.PowerStatus switch
+            {
+                LibCec.CEC_POWER_STATUS_ON => new SolidColorBrush(Color.FromRgb(16, 185, 129)),
+                LibCec.CEC_POWER_STATUS_STANDBY => new SolidColorBrush(Color.FromRgb(245, 158, 11)),
+                _ => new SolidColorBrush(Color.FromRgb(156, 163, 175))
+            };
+        }
+    }
+
+    public string CecVolumeText
+    {
+        get
+        {
+            if (_cecService == null || !_cecService.IsConnected) return string.Empty;
+            var st = _cecService.AudioStatus;
+            return $"Volume: {st.VolumePercent}%" + (st.IsMuted ? " (Muted)" : "");
+        }
+    }
+
+    public bool IsPowerSyncEnabled
+    {
+        get => _settings.CecPowerSyncEnabled;
+        set
+        {
+            if (_settings.CecPowerSyncEnabled != value)
+            {
+                _settings.CecPowerSyncEnabled = value;
+                if (_cecService != null)
+                {
+                    _cecService.AutoPowerSyncEnabled = value;
+                }
+                SaveSettings();
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public async Task PowerOnSoundbarAsync()
+    {
+        if (_cecService != null)
+        {
+            await _cecService.PowerOnSoundbarAsync();
+            OnPropertyChanged(nameof(CecPowerStatusText));
+            OnPropertyChanged(nameof(CecPowerStatusBrush));
+        }
+    }
+
+    public async Task StandbySoundbarAsync()
+    {
+        if (_cecService != null)
+        {
+            await _cecService.StandbySoundbarAsync();
+            OnPropertyChanged(nameof(CecPowerStatusText));
+            OnPropertyChanged(nameof(CecPowerStatusBrush));
+        }
+    }
+
+    public async Task RefreshCecStatusAsync()
+    {
+        if (_cecService != null)
+        {
+            await _cecService.RefreshStatusAsync();
+            OnCecStateChanged();
+        }
     }
 
     public void LoadDisplays()
@@ -395,8 +568,15 @@ public class MainWindowViewModel : INotifyPropertyChanged
         // If no target primary is set or target primary is excluded, pick OS primary or first non-excluded
         EnsureValidTargetPrimary();
 
+        // Auto-select soundbar: match saved setting, or display with audio endpoint (e.g. SOUNDSLAYER), or first non-primary
+        SelectedSoundbar = Displays.FirstOrDefault(d => !string.IsNullOrEmpty(_settings.SelectedSoundbarIdentifier) &&
+                                                        (d.HardwareId == _settings.SelectedSoundbarIdentifier || d.FriendlyName == _settings.SelectedSoundbarIdentifier))
+                           ?? Displays.FirstOrDefault(d => d.HasAudioEndpoint)
+                           ?? Displays.FirstOrDefault(d => !d.IsOsPrimary)
+                           ?? Displays.FirstOrDefault();
+
         // Default selection to target primary or first display
-        SelectedDisplay = Displays.FirstOrDefault(d => d.IsTargetPrimary) ?? Displays.FirstOrDefault();
+        SelectedDisplay = SelectedSoundbar ?? Displays.FirstOrDefault(d => d.IsTargetPrimary) ?? Displays.FirstOrDefault();
 
         SyncConfiguration();
         UpdateAudioKeepAliveTargets();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Interop;
@@ -123,5 +123,20 @@ public partial class MainWindow : Window
     private async void OnApplyUpdateClicked(object sender, RoutedEventArgs e)
     {
         await ViewModel.ApplyUpdateAsync();
+    }
+
+    private async void OnPowerOnClicked(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.PowerOnSoundbarAsync();
+    }
+
+    private async void OnStandbyClicked(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.StandbySoundbarAsync();
+    }
+
+    private async void OnRefreshCecClicked(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.RefreshCecStatusAsync();
     }
 }

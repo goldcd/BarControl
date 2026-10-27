@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Windows;
 using BarControl.Core.Audio;
+using BarControl.Core.Cec;
 using BarControl.Core.Config;
 using BarControl.Core.Engine;
 using BarControl.Core.Startup;
@@ -19,6 +20,7 @@ public partial class App : Application
     private WindowRelocationEngine? _engine;
     private TrayIconService? _trayService;
     private AudioKeepAliveService? _audioService;
+    private CecService? _cecService;
     private MainWindowViewModel? _viewModel;
     private MainWindow? _mainWindow;
 
@@ -46,8 +48,9 @@ public partial class App : Application
         _engine = new WindowRelocationEngine();
         _trayService = new TrayIconService();
         _audioService = new AudioKeepAliveService(startEnabled: true);
+        _cecService = new CecService();
 
-        _viewModel = new MainWindowViewModel(_engine, _trayService, _audioService);
+        _viewModel = new MainWindowViewModel(_engine, _trayService, _audioService, _cecService);
         _mainWindow = new MainWindow(_viewModel);
 
         _trayService.OnOpenRequested += ShowMainWindow;
@@ -55,6 +58,9 @@ public partial class App : Application
 
         // Start window relocation engine hooks
         _engine.Start();
+
+        // Start CEC discovery in background
+        _ = _cecService.InitializeAsync();
 
         // Check if started with --minimized flag or configured to start minimized
         bool startMinimized = e.Args.Any(arg => arg.Equals("--minimized", StringComparison.OrdinalIgnoreCase))
@@ -100,6 +106,7 @@ public partial class App : Application
     private void ShutdownApplication()
     {
         _mainWindow?.RequestExplicitExit();
+        _cecService?.Dispose();
         _audioService?.Dispose();
         _engine?.Dispose();
         _trayService?.Dispose();
@@ -112,6 +119,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _cecService?.Dispose();
         _engine?.Dispose();
         _trayService?.Dispose();
 
