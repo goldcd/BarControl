@@ -1,104 +1,9 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
 namespace BarControl.UI;
-
-public class BlockButtonTextConverter : IValueConverter
-{
-    public static readonly BlockButtonTextConverter Instance = new();
-
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        if (value is bool isExcluded && isExcluded)
-        {
-            return "Allow Display";
-        }
-        return "Block Display";
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
-        throw new NotImplementedException();
-}
-
-public class BlockButtonStyleConverter : IValueConverter
-{
-    public static readonly BlockButtonStyleConverter Instance = new();
-
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        if (Application.Current?.MainWindow is Window window)
-        {
-            if (value is bool isExcluded && isExcluded)
-            {
-                return window.FindResource("SuccessButtonStyle");
-            }
-            return window.FindResource("DangerButtonStyle");
-        }
-        return DependencyProperty.UnsetValue;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
-        throw new NotImplementedException();
-}
-
-public class PrimaryButtonTextConverter : IValueConverter
-{
-    public static readonly PrimaryButtonTextConverter Instance = new();
-
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        if (value is bool isTargetPrimary && isTargetPrimary)
-        {
-            return "Current Primary";
-        }
-        return "Set as Primary";
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
-        throw new NotImplementedException();
-}
-
-public class ZeroCountToVisibilityConverter : IValueConverter
-{
-    public static readonly ZeroCountToVisibilityConverter Instance = new();
-
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        if (value is int count && count > 0)
-        {
-            return Visibility.Collapsed;
-        }
-        return Visibility.Visible;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
-        throw new NotImplementedException();
-}
-
-public class InverseBooleanConverter : IValueConverter
-{
-    public static readonly InverseBooleanConverter Instance = new();
-
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        if (value is bool b)
-        {
-            return !b;
-        }
-        return true;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        if (value is bool b)
-        {
-            return !b;
-        }
-        return false;
-    }
-}
 
 public class BooleanToVisibilityConverter : IValueConverter
 {
@@ -121,4 +26,43 @@ public class BooleanToVisibilityConverter : IValueConverter
         }
         return false;
     }
+}
+
+public class PercentageToWidthConverter : IMultiValueConverter
+{
+    public static readonly PercentageToWidthConverter Instance = new();
+
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length >= 2 && values[0] is int percent && values[1] is double totalWidth)
+        {
+            if (double.IsNaN(totalWidth) || totalWidth <= 0) return 0.0;
+            double clamped = Math.Clamp(percent, 0, 100) / 100.0;
+            return Math.Max(0.0, totalWidth * clamped);
+        }
+        return 0.0;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        throw new NotImplementedException();
+}
+
+public class PercentageToMarkerMarginConverter : IMultiValueConverter
+{
+    public static readonly PercentageToMarkerMarginConverter Instance = new();
+
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length >= 2 && values[0] is int percent && values[1] is double totalWidth)
+        {
+            if (double.IsNaN(totalWidth) || totalWidth <= 0) return new Thickness(0);
+            double clamped = Math.Clamp(percent, 0, 100) / 100.0;
+            double x = Math.Clamp((totalWidth * clamped) - 1.5, 0.0, Math.Max(0.0, totalWidth - 3.0));
+            return new Thickness(x, 0, 0, 0);
+        }
+        return new Thickness(0);
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        throw new NotImplementedException();
 }

@@ -32,11 +32,15 @@ public class CecService : IDisposable
     public bool AutoPowerSyncEnabled { get; set; } = true;
     public volatile bool IsUiActive = true;
 
+    public CecVolumeController VolumeController { get; }
+
     public event Action? StateChanged;
 
     public CecService(bool autoPowerSync = true)
     {
         AutoPowerSyncEnabled = autoPowerSync;
+        VolumeController = new CecVolumeController(this);
+        VolumeController.VolumeStateChanged += () => StateChanged?.Invoke();
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
     }
 
@@ -176,6 +180,7 @@ public class CecService : IDisposable
             bool isMuted = (rawAudio & 0x80) != 0;
             int vol = rawAudio & 0x7F;
             AudioStatus = new CecAudioStatus(isMuted, vol);
+            VolumeController.OnHardwareAudioStatusReported(AudioStatus, syncRequestedIfIdle: true);
 
             // 3. Only query OSD name if not yet resolved
             if (SoundbarName == "HDMI Soundbar")
@@ -227,9 +232,12 @@ public class CecService : IDisposable
                     await Task.Delay(pollDelay, token);
                     if (token.IsCancellationRequested) break;
 
+                    // Pause background polling while the closed-loop volume chaser is actively stepping the soundbar
+                    if (VolumeController.IsChasing) continue;
+
                     lock (_lock)
                     {
-                        if (_conn == IntPtr.Zero || !IsConnected || _isActionInProgress) continue;
+                        if (_conn == IntPtr.Zero || !IsConnected || _isActionInProgress || VolumeController.IsChasing) continue;
 
                         int oldPower = PowerStatus;
                         var oldAudio = AudioStatus;
@@ -255,53 +263,83 @@ public class CecService : IDisposable
         }, token);
     }
 
-    public async Task<int> StepVolumeAsync(bool up)
+    /// <summary>
+    /// Sends a small burst of Volume Up or Down keypresses (followed by a single release) and reads the updated
+    /// audio status reported back by the soundbar. Used by CecVolumeController's closed-loop chaser.
+    /// </summary>
+    internal CecAudioStatus ExecuteVolumeStepBurst(bool up, int steps)
     {
-        return await Task.Run(() =>
+        lock (_lock)
         {
-            lock (_lock)
+            if (_conn == IntPtr.Zero || !IsConnected) return new CecAudioStatus(false, -1);
+
+            int code = up ? LibCec.CEC_USER_CONTROL_CODE_VOLUME_UP : LibCec.CEC_USER_CONTROL_CODE_VOLUME_DOWN;
+            int count = Math.Clamp(steps, 1, 5);
+
+            for (int i = 0; i < count; i++)
             {
-                if (_conn == IntPtr.Zero || !IsConnected) return -1;
-                int code = up ? LibCec.CEC_USER_CONTROL_CODE_VOLUME_UP : LibCec.CEC_USER_CONTROL_CODE_VOLUME_DOWN;
                 LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, code, 1);
-                LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
-                Thread.Sleep(80);
-                RefreshDeviceInfoInternal();
-                StateChanged?.Invoke();
-                return AudioStatus.VolumePercent;
+                if (i < count - 1)
+                {
+                    // Brief spacing between consecutive presses so soundbar processes each step reliably
+                    Thread.Sleep(45);
+                }
             }
-        });
+
+            LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
+
+            // Allow soundbar's automatic <Report Audio Status> (0x7A) frame to arrive
+            Thread.Sleep(55);
+
+            byte rawAudio = LibCec.libcec_audio_get_status(_conn);
+            bool isMuted = (rawAudio & 0x80) != 0;
+            int vol = rawAudio & 0x7F;
+            if (vol >= 0 && vol <= 100)
+            {
+                AudioStatus = new CecAudioStatus(isMuted, vol);
+            }
+
+            return AudioStatus;
+        }
     }
 
-    public async Task SetVolumeTargetAsync(int targetPercent)
+    /// <summary>
+    /// Queries <Give Audio Status> (0x71) directly from the wire without querying power/OSD/vendor.
+    /// </summary>
+    internal CecAudioStatus QueryAudioStatusFromWire()
     {
-        await Task.Run(() =>
+        lock (_lock)
         {
-            lock (_lock)
+            if (_conn == IntPtr.Zero || !IsConnected) return new CecAudioStatus(false, -1);
+
+            var audioCmd = CecCommand.Create(
+                LibCec.CECDEVICE_RECORDINGDEVICE1,
+                TargetLogicalAddress,
+                LibCec.CEC_OPCODE_GIVE_AUDIO_STATUS);
+            LibCec.libcec_transmit(_conn, ref audioCmd);
+
+            Thread.Sleep(90);
+            byte rawAudio = LibCec.libcec_audio_get_status(_conn);
+            bool isMuted = (rawAudio & 0x80) != 0;
+            int vol = rawAudio & 0x7F;
+            if (vol >= 0 && vol <= 100)
             {
-                if (_conn == IntPtr.Zero || !IsConnected) return;
-
-                int current = AudioStatus.VolumePercent;
-                int diff = targetPercent - current;
-                if (diff == 0) return;
-
-                int steps = Math.Abs(diff);
-                // Cap to max 15 steps per drag to avoid CEC bus saturation
-                steps = Math.Min(steps, 15);
-                int code = diff > 0 ? LibCec.CEC_USER_CONTROL_CODE_VOLUME_UP : LibCec.CEC_USER_CONTROL_CODE_VOLUME_DOWN;
-
-                for (int i = 0; i < steps; i++)
-                {
-                    LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, code, 1);
-                    LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
-                    Thread.Sleep(30);
-                }
-
-                Thread.Sleep(100);
-                RefreshDeviceInfoInternal();
-                StateChanged?.Invoke();
+                AudioStatus = new CecAudioStatus(isMuted, vol);
             }
-        });
+            return AudioStatus;
+        }
+    }
+
+    public Task StepVolumeAsync(bool up)
+    {
+        VolumeController.RequestStep(up ? 2 : -2);
+        return Task.CompletedTask;
+    }
+
+    public Task SetVolumeTargetAsync(int targetPercent)
+    {
+        VolumeController.RequestVolume(targetPercent);
+        return Task.CompletedTask;
     }
 
     public async Task<bool> PowerOnSoundbarAsync()
@@ -468,6 +506,8 @@ public class CecService : IDisposable
             _pollCts?.Cancel();
             _pollCts?.Dispose();
             _pollCts = null;
+
+            VolumeController.Dispose();
 
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
 

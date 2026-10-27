@@ -3,6 +3,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Media;
 using BarControl.Core.Audio;
 using BarControl.Core.Cec;
@@ -12,10 +14,6 @@ using BarControl.Core.Display;
 using BarControl.Core.Engine;
 using BarControl.Core.Startup;
 using BarControl.Core.Tray;
-using BarControl.Core.Update;
-using BarControl.Models;
-using System.Threading.Tasks;
-using System.Windows;
 
 namespace BarControl.UI;
 
@@ -25,15 +23,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private readonly TrayIconService _trayService;
     private readonly AudioKeepAliveService? _audioService;
     private readonly CecService? _cecService;
-    private AppSettings _settings;
+    private readonly AppSettings _settings;
 
     private bool _isGuardActive = true;
-    private int _relocatedCount = 0;
-    private string _statusText = "GUARD ACTIVE";
-    private Brush _statusBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
 
     public ObservableCollection<DisplayInfo> Displays { get; } = new();
-    public ObservableCollection<RelocationLogItem> RelocationLog { get; } = new();
 
     public bool IsGuardActive
     {
@@ -44,123 +38,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
             {
                 _isGuardActive = value;
                 _settings.IsGuardEnabled = value;
-                UpdateGuardStatusVisuals();
                 _trayService.SetGuardState(value);
                 SyncConfiguration();
                 SaveSettings();
                 OnPropertyChanged();
             }
-        }
-    }
-
-    public void ToggleGuard()
-    {
-        IsGuardActive = !IsGuardActive;
-    }
-
-    public int RelocatedCount
-    {
-        get => _relocatedCount;
-        set
-        {
-            _relocatedCount = value;
-            OnPropertyChanged();
-        }
-    }
-
-    private DisplayInfo? _selectedDisplay;
-
-    public DisplayInfo? SelectedDisplay
-    {
-        get => _selectedDisplay;
-        set
-        {
-            if (_selectedDisplay != value)
-            {
-                _selectedDisplay = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(IsSelectedPrimary));
-                OnPropertyChanged(nameof(IsSelectedExcluded));
-            }
-        }
-    }
-
-    private IntPtr _currentAppHMonitor = IntPtr.Zero;
-    public IntPtr CurrentAppHMonitor
-    {
-        get => _currentAppHMonitor;
-        set
-        {
-            if (_currentAppHMonitor != value)
-            {
-                _currentAppHMonitor = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(CanSetSelectedAsPrimary));
-                OnPropertyChanged(nameof(PrimaryButtonToolTip));
-            }
-        }
-    }
-
-    public bool CanSetSelectedAsPrimary
-    {
-        get
-        {
-            if (SelectedDisplay == null) return false;
-            if (SelectedDisplay.IsTargetPrimary) return false;
-            if (SelectedDisplay.IsExcluded) return false;
-
-            // Feedback 3: Only the display the app is currently on can be set as primary!
-            if (CurrentAppHMonitor != IntPtr.Zero && SelectedDisplay.HMonitor != IntPtr.Zero)
-            {
-                return SelectedDisplay.HMonitor == CurrentAppHMonitor;
-            }
-            return true;
-        }
-    }
-
-    public string PrimaryButtonToolTip
-    {
-        get
-        {
-            if (SelectedDisplay == null) return string.Empty;
-            if (SelectedDisplay.IsTargetPrimary) return "This display is already designated as the primary target.";
-            if (SelectedDisplay.IsExcluded) return "A blocked display cannot be designated as primary.";
-            if (CurrentAppHMonitor != IntPtr.Zero && SelectedDisplay.HMonitor != IntPtr.Zero && SelectedDisplay.HMonitor != CurrentAppHMonitor)
-            {
-                return "Safety Protection: Only the display currently showing this BarControl window can be set as primary. Move this window to that display first.";
-            }
-            return "Set this display as the primary target.";
-        }
-    }
-
-    public void UpdateCurrentAppMonitor(IntPtr hMonitor)
-    {
-        CurrentAppHMonitor = hMonitor;
-    }
-
-    public bool IsSelectedPrimary => SelectedDisplay?.IsTargetPrimary ?? false;
-    public bool IsSelectedExcluded => SelectedDisplay?.IsExcluded ?? false;
-
-    public int BlockedCount => Displays.Count(d => d.IsExcluded);
-    public int AllowedCount => Displays.Count(d => !d.IsExcluded);
-
-    public string StatusText
-    {
-        get => _statusText;
-        private set
-        {
-            _statusText = value;
-            OnPropertyChanged();
-        }
-    }
-
-    public Brush StatusBrush
-    {
-        get => _statusBrush;
-        private set
-        {
-            _statusBrush = value;
-            OnPropertyChanged();
         }
     }
 
@@ -170,83 +52,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
         {
             var v = typeof(MainWindowViewModel).Assembly.GetName().Version;
             return v != null ? $"v{v.Major}.{v.Minor}.{Math.Max(v.Build, 0)}" : "v1.0.0";
-        }
-    }
-
-    private readonly UpdateService _updateService = new();
-    private UpdateInfo? _availableUpdate;
-    private bool _isDownloadingUpdate;
-    private string _updateButtonText = "Update";
-
-    public bool IsUpdateAvailable => _availableUpdate != null;
-    public string? AvailableUpdateVersion => _availableUpdate?.Version;
-
-    public bool IsDownloadingUpdate
-    {
-        get => _isDownloadingUpdate;
-        set
-        {
-            if (_isDownloadingUpdate != value)
-            {
-                _isDownloadingUpdate = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    public string UpdateButtonText
-    {
-        get => _updateButtonText;
-        set
-        {
-            if (_updateButtonText != value)
-            {
-                _updateButtonText = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    public async Task CheckForUpdatesAsync()
-    {
-        try
-        {
-            var update = await _updateService.CheckForUpdateAsync();
-            if (update != null)
-            {
-                _availableUpdate = update;
-                UpdateButtonText = $"Update to {update.Version}";
-                OnPropertyChanged(nameof(IsUpdateAvailable));
-                OnPropertyChanged(nameof(AvailableUpdateVersion));
-            }
-        }
-        catch
-        {
-            // Silently ignore check failures
-        }
-    }
-
-    public async Task ApplyUpdateAsync()
-    {
-        if (_availableUpdate == null || IsDownloadingUpdate)
-            return;
-
-        try
-        {
-            IsDownloadingUpdate = true;
-            UpdateButtonText = "Downloading...";
-            var progress = new Progress<double>(p =>
-            {
-                UpdateButtonText = $"Downloading... {p:P0}";
-            });
-
-            await _updateService.ApplyUpdateAsync(_availableUpdate, progress);
-        }
-        catch (Exception ex)
-        {
-            IsDownloadingUpdate = false;
-            UpdateButtonText = "Update failed (retry)";
-            MessageBox.Show($"Could not apply update:\n{ex.Message}", "Update Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -279,39 +84,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool ShowNotifications
-    {
-        get => _settings.ShowNotificationOnRelocate;
-        set
-        {
-            if (_settings.ShowNotificationOnRelocate != value)
-            {
-                _settings.ShowNotificationOnRelocate = value;
-                SaveSettings();
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    public bool KeepAudioAwake
-    {
-        get => _settings.KeepAudioAwake;
-        set
-        {
-            if (_settings.KeepAudioAwake != value)
-            {
-                _settings.KeepAudioAwake = value;
-                if (_audioService != null)
-                {
-                    _audioService.IsEnabled = value;
-                }
-                SaveSettings();
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    public MainWindowViewModel(WindowRelocationEngine engine, TrayIconService trayService, AudioKeepAliveService? audioService = null, CecService? cecService = null)
+    public MainWindowViewModel(
+        WindowRelocationEngine engine,
+        TrayIconService trayService,
+        AudioKeepAliveService? audioService = null,
+        CecService? cecService = null)
     {
         _engine = engine;
         _trayService = trayService;
@@ -331,17 +108,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
         }
 
         _isGuardActive = _settings.IsGuardEnabled;
-        UpdateGuardStatusVisuals();
-
-        _engine.OnWindowRelocated += HandleWindowRelocated;
+        _trayService.SetGuardState(_isGuardActive);
 
         LoadDisplays();
-
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(2000);
-            await CheckForUpdatesAsync();
-        });
     }
 
     private void OnCecStateChanged()
@@ -365,7 +134,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
             if (_selectedSoundbar != value)
             {
                 _selectedSoundbar = value;
-                SelectedDisplay = value;
                 if (value != null)
                 {
                     _settings.SelectedSoundbarIdentifier = !string.IsNullOrEmpty(value.HardwareId) ? value.HardwareId : value.FriendlyName;
@@ -373,24 +141,53 @@ public class MainWindowViewModel : INotifyPropertyChanged
                 }
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsPhantomDisplayGuardEnabled));
+                OnPropertyChanged(nameof(CanEnablePhantomDisplayGuard));
+                OnPropertyChanged(nameof(PhantomDisplayGuardToolTip));
                 OnPropertyChanged(nameof(IsAudioKeepAliveEnabled));
             }
         }
     }
 
+    /// <summary>
+    /// Safety Protection: The Windows Primary (or Target Primary) monitor can NEVER be guarded/excluded,
+    /// preventing the user from accidentally moving all windows off their real monitor onto the phantom soundbar display.
+    /// </summary>
+    public bool CanEnablePhantomDisplayGuard =>
+        SelectedSoundbar != null && !SelectedSoundbar.IsOsPrimary && !SelectedSoundbar.IsTargetPrimary;
+
+    public string PhantomDisplayGuardToolTip
+    {
+        get
+        {
+            if (SelectedSoundbar == null)
+                return "Select a soundbar display above.";
+            if (SelectedSoundbar.IsOsPrimary || SelectedSoundbar.IsTargetPrimary)
+                return "Safety Protection: Your primary monitor cannot be blocked by Phantom Display Guard.";
+            return "Prevent windows and dialogs from getting lost on this phantom soundbar display.";
+        }
+    }
+
     public bool IsPhantomDisplayGuardEnabled
     {
-        get => SelectedSoundbar?.IsExcluded ?? false;
+        get => SelectedSoundbar != null && !SelectedSoundbar.IsOsPrimary && !SelectedSoundbar.IsTargetPrimary && SelectedSoundbar.IsExcluded;
         set
         {
-            if (SelectedSoundbar != null && SelectedSoundbar.IsExcluded != value)
+            if (SelectedSoundbar == null) return;
+
+            if (value && (SelectedSoundbar.IsOsPrimary || SelectedSoundbar.IsTargetPrimary))
+            {
+                MessageBox.Show(
+                    "You cannot enable Phantom Display Guard on your primary monitor.\nPlease select your HDMI soundbar display in the dropdown above.",
+                    "Primary Monitor Protected",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                OnPropertyChanged();
+                return;
+            }
+
+            if (SelectedSoundbar.IsExcluded != value)
             {
                 SelectedSoundbar.IsExcluded = value;
-                if (value && SelectedSoundbar.IsTargetPrimary)
-                {
-                    SelectedSoundbar.IsTargetPrimary = false;
-                    EnsureValidTargetPrimary();
-                }
                 UpdateExcludedSettingsList();
                 SyncConfiguration();
                 SaveSettings();
@@ -419,37 +216,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
     public string SoundbarCecName => _cecService?.SoundbarName ?? "Audio";
     public string SoundbarVendor => _cecService?.SoundbarVendor ?? "Panasonic";
 
-    public string CecPowerStatusText
-    {
-        get
-        {
-            if (_cecService == null || !_cecService.IsConnected) return "SEARCHING FOR ADAPTER...";
-            return _cecService.PowerStatus switch
-            {
-                LibCec.CEC_POWER_STATUS_ON => "POWERED ON",
-                LibCec.CEC_POWER_STATUS_STANDBY => "STANDBY",
-                LibCec.CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON => "POWERING ON...",
-                LibCec.CEC_POWER_STATUS_IN_TRANSITION_ON_TO_STANDBY => "ENTERING STANDBY...",
-                _ => "UNKNOWN / SLEEP"
-            };
-        }
-    }
-
-    public Brush CecPowerStatusBrush
-    {
-        get
-        {
-            if (_cecService == null || !_cecService.IsConnected) return new SolidColorBrush(Color.FromRgb(113, 113, 122));
-            return _cecService.PowerStatus switch
-            {
-                LibCec.CEC_POWER_STATUS_ON => new SolidColorBrush(Color.FromRgb(16, 185, 129)),
-                LibCec.CEC_POWER_STATUS_STANDBY => new SolidColorBrush(Color.FromRgb(245, 158, 11)),
-                LibCec.CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON => new SolidColorBrush(Color.FromRgb(59, 130, 246)),
-                LibCec.CEC_POWER_STATUS_IN_TRANSITION_ON_TO_STANDBY => new SolidColorBrush(Color.FromRgb(239, 68, 68)),
-                _ => new SolidColorBrush(Color.FromRgb(156, 163, 175))
-            };
-        }
-    }
+    public int CecActualVolumePercent => _cecService?.VolumeController.ActualVolume ?? 0;
+    public int CecRequestedVolumePercent => _cecService?.VolumeController.RequestedVolume ?? 0;
+    public bool IsVolumeChasing => _cecService?.VolumeController.IsChasing ?? false;
 
     public string CecVolumeText
     {
@@ -458,7 +227,17 @@ public class MainWindowViewModel : INotifyPropertyChanged
             if (_cecService == null || !_cecService.IsConnected) return string.Empty;
             var st = _cecService.AudioStatus;
             if (st.VolumePercent == 127) return "Vol: --";
-            return (st.IsMuted ? "🔇 " : "🔊 ") + $"Vol: {st.VolumePercent}%" + (st.IsMuted ? " (Muted)" : "");
+            int actual = _cecService.VolumeController.ActualVolume;
+            int requested = _cecService.VolumeController.RequestedVolume;
+            bool chasing = _cecService.VolumeController.IsChasing;
+            string icon = st.IsMuted ? "🔇 " : "🔊 ";
+            string muteSuffix = st.IsMuted ? " (Muted)" : "";
+
+            if (chasing && Math.Abs(requested - actual) > 1)
+            {
+                return $"{icon}Vol: {actual}% → {requested}%{muteSuffix}";
+            }
+            return $"{icon}Vol: {actual}%{muteSuffix}";
         }
     }
 
@@ -575,13 +354,10 @@ public class MainWindowViewModel : INotifyPropertyChanged
             {
                 _isOperatingPower = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(CanOperatePower));
                 OnPropertyChanged(nameof(CanTogglePower));
             }
         }
     }
-
-    public bool CanOperatePower => !IsOperatingPower;
 
     public bool IsUiActive
     {
@@ -599,6 +375,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     private int _sliderVolumePercent;
     private bool _isUserDraggingSlider;
+    private bool _isUpdatingSliderFromHardware;
 
     public int CecVolumeSliderValue
     {
@@ -609,6 +386,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
             {
                 _sliderVolumePercent = value;
                 OnPropertyChanged();
+
+                if (!_isUpdatingSliderFromHardware && _cecService != null && CanControlVolume)
+                {
+                    _cecService.VolumeController.RequestVolume(value);
+                }
             }
         }
     }
@@ -618,51 +400,80 @@ public class MainWindowViewModel : INotifyPropertyChanged
         _isUserDraggingSlider = true;
     }
 
-    public async Task OnSliderDragEndedAsync()
+    public Task OnSliderDragEndedAsync()
     {
         _isUserDraggingSlider = false;
         if (_cecService != null && CanControlVolume)
         {
-            await _cecService.SetVolumeTargetAsync(_sliderVolumePercent);
+            _cecService.VolumeController.RequestVolume(_sliderVolumePercent);
         }
+        return Task.CompletedTask;
     }
 
-    public async Task StepVolumeUpAsync()
+    public Task StepVolumeUpAsync()
     {
         if (_cecService != null && CanControlVolume)
         {
-            await _cecService.StepVolumeAsync(true);
+            _cecService.VolumeController.RequestStep(2);
+            _isUpdatingSliderFromHardware = true;
+            try
+            {
+                CecVolumeSliderValue = _cecService.VolumeController.RequestedVolume;
+            }
+            finally
+            {
+                _isUpdatingSliderFromHardware = false;
+            }
         }
+        return Task.CompletedTask;
     }
 
-    public async Task StepVolumeDownAsync()
+    public Task StepVolumeDownAsync()
     {
         if (_cecService != null && CanControlVolume)
         {
-            await _cecService.StepVolumeAsync(false);
+            _cecService.VolumeController.RequestStep(-2);
+            _isUpdatingSliderFromHardware = true;
+            try
+            {
+                CecVolumeSliderValue = _cecService.VolumeController.RequestedVolume;
+            }
+            finally
+            {
+                _isUpdatingSliderFromHardware = false;
+            }
         }
+        return Task.CompletedTask;
     }
 
     public void NotifyPowerButtonState()
     {
         OnPropertyChanged(nameof(IsOperatingPower));
-        OnPropertyChanged(nameof(CanOperatePower));
         OnPropertyChanged(nameof(CanTogglePower));
         OnPropertyChanged(nameof(CanControlVolume));
         OnPropertyChanged(nameof(PowerToggleButtonText));
         OnPropertyChanged(nameof(PowerToggleButtonBackground));
         OnPropertyChanged(nameof(PowerToggleButtonBorderBrush));
         OnPropertyChanged(nameof(PowerToggleButtonForeground));
-        OnPropertyChanged(nameof(CecPowerStatusText));
-        OnPropertyChanged(nameof(CecPowerStatusBrush));
         OnPropertyChanged(nameof(CecVolumeText));
+        OnPropertyChanged(nameof(CecActualVolumePercent));
+        OnPropertyChanged(nameof(CecRequestedVolumePercent));
+        OnPropertyChanged(nameof(IsVolumeChasing));
 
         if (!_isUserDraggingSlider && _cecService != null)
         {
-            int vol = _cecService.AudioStatus.VolumePercent;
-            if (vol >= 0 && vol <= 100)
+            int targetVol = _cecService.VolumeController.RequestedVolume;
+            if (targetVol >= 0 && targetVol <= 100)
             {
-                CecVolumeSliderValue = vol;
+                _isUpdatingSliderFromHardware = true;
+                try
+                {
+                    CecVolumeSliderValue = targetVol;
+                }
+                finally
+                {
+                    _isUpdatingSliderFromHardware = false;
+                }
             }
         }
     }
@@ -717,15 +528,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public async Task RefreshCecStatusAsync()
-    {
-        if (_cecService != null)
-        {
-            await _cecService.RefreshStatusAsync();
-            OnCecStateChanged();
-        }
-    }
-
     public void LoadDisplays()
     {
         Displays.Clear();
@@ -733,10 +535,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
         foreach (var m in monitors)
         {
-            // Restore saved settings
-            if (_settings.ExcludedIdentifiers.Contains(m.HardwareId) ||
-                _settings.ExcludedIdentifiers.Contains(m.DeviceName) ||
-                _settings.ExcludedIdentifiers.Contains(m.FriendlyName))
+            // Restore saved settings — NEVER allow the OS Primary monitor to be excluded
+            if (!m.IsOsPrimary &&
+                (_settings.ExcludedIdentifiers.Contains(m.HardwareId) ||
+                 _settings.ExcludedIdentifiers.Contains(m.DeviceName) ||
+                 _settings.ExcludedIdentifiers.Contains(m.FriendlyName)))
             {
                 m.IsExcluded = true;
             }
@@ -770,8 +573,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
             Displays.Add(m);
         }
 
-        // If the saved target primary monitor is no longer connected (e.g. replaced with a new monitor),
-        // clear the stale reference so BarControl cleanly adopts the new Windows primary.
+        // If the saved target primary monitor is no longer connected, clear the stale reference
         if (!string.IsNullOrEmpty(_settings.TargetPrimaryHardwareId) &&
             !monitors.Any(m => m.HardwareId == _settings.TargetPrimaryHardwareId || m.DeviceName == _settings.TargetPrimaryDeviceName))
         {
@@ -780,59 +582,31 @@ public class MainWindowViewModel : INotifyPropertyChanged
             SaveSettings();
         }
 
-        // If no target primary is set or target primary is excluded, pick OS primary or first non-excluded
         EnsureValidTargetPrimary();
 
-        // Auto-select soundbar: match saved setting, or display with audio endpoint (e.g. SOUNDSLAYER), or first non-primary
+        // Auto-select soundbar: match saved setting, or non-primary display with audio endpoint (e.g. SOUNDSLAYER), or first non-primary
         SelectedSoundbar = Displays.FirstOrDefault(d => !string.IsNullOrEmpty(_settings.SelectedSoundbarIdentifier) &&
                                                         (d.HardwareId == _settings.SelectedSoundbarIdentifier || d.FriendlyName == _settings.SelectedSoundbarIdentifier))
-                           ?? Displays.FirstOrDefault(d => d.HasAudioEndpoint)
+                           ?? Displays.FirstOrDefault(d => !d.IsOsPrimary && d.HasAudioEndpoint)
                            ?? Displays.FirstOrDefault(d => !d.IsOsPrimary)
                            ?? Displays.FirstOrDefault();
 
-        // Default selection to target primary or first display
-        SelectedDisplay = SelectedSoundbar ?? Displays.FirstOrDefault(d => d.IsTargetPrimary) ?? Displays.FirstOrDefault();
-
+        UpdateExcludedSettingsList();
         SyncConfiguration();
         UpdateAudioKeepAliveTargets();
-        OnPropertyChanged(nameof(BlockedCount));
-        OnPropertyChanged(nameof(AllowedCount));
-    }
-
-    public void SetSelectedAsPrimary()
-    {
-        if (SelectedDisplay != null)
-        {
-            SetTargetPrimary(SelectedDisplay);
-            OnPropertyChanged(nameof(IsSelectedPrimary));
-            OnPropertyChanged(nameof(IsSelectedExcluded));
-        }
-    }
-
-    public void ToggleSelectedExcluded()
-    {
-        if (SelectedDisplay != null)
-        {
-            ToggleExcluded(SelectedDisplay);
-            OnPropertyChanged(nameof(IsSelectedPrimary));
-            OnPropertyChanged(nameof(IsSelectedExcluded));
-        }
-    }
-
-    public void IdentifySelected()
-    {
-        if (SelectedDisplay != null)
-        {
-            IdentifySingleDisplay(SelectedDisplay);
-        }
     }
 
     private void EnsureValidTargetPrimary()
     {
+        // Primary monitor can never be excluded
+        foreach (var d in Displays.Where(d => d.IsOsPrimary))
+        {
+            d.IsExcluded = false;
+        }
+
         var target = Displays.FirstOrDefault(d => d.IsTargetPrimary && !d.IsExcluded);
         if (target == null)
         {
-            // Pick OS primary if not excluded
             target = Displays.FirstOrDefault(d => d.IsOsPrimary && !d.IsExcluded)
                      ?? Displays.FirstOrDefault(d => !d.IsExcluded);
 
@@ -846,104 +620,26 @@ public class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public void SetTargetPrimary(DisplayInfo selectedDisplay)
+    private void OnDisplaySettingChanged(DisplayInfo display, string propertyName)
     {
-        if (selectedDisplay.IsExcluded)
+        if (propertyName == nameof(DisplayInfo.IsExcluded) && display.IsExcluded && (display.IsTargetPrimary || display.IsOsPrimary))
         {
-            selectedDisplay.IsExcluded = false; // Cannot be primary and excluded
-        }
-
-        foreach (var d in Displays)
-        {
-            d.IsTargetPrimary = (d == selectedDisplay);
-        }
-
-        _settings.TargetPrimaryHardwareId = selectedDisplay.HardwareId;
-        _settings.TargetPrimaryDeviceName = selectedDisplay.DeviceName;
-
-        SyncConfiguration();
-        SaveSettings();
-        OnPropertyChanged(nameof(BlockedCount));
-        OnPropertyChanged(nameof(AllowedCount));
-    }
-
-    public void ToggleExcluded(DisplayInfo display)
-    {
-        if (!display.IsExcluded && display.IsTargetPrimary)
-        {
-            MessageBox.Show(
-                "You cannot block your primary target display.\nPlease set another display as your primary target first.",
-                "Primary Display Cannot Be Blocked",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            // Refuse to exclude primary display
+            display.IsExcluded = false;
             return;
         }
 
-        display.IsExcluded = !display.IsExcluded;
-
         UpdateExcludedSettingsList();
         SyncConfiguration();
         SaveSettings();
-
-        OnPropertyChanged(nameof(BlockedCount));
-        OnPropertyChanged(nameof(AllowedCount));
-        OnPropertyChanged(nameof(IsSelectedPrimary));
-        OnPropertyChanged(nameof(IsSelectedExcluded));
-
-        if (display.IsExcluded)
-        {
-            // Immediately relocate any windows sitting on this newly excluded monitor
-            SweepNow();
-        }
-    }
-
-    public void ResetToWindowsPrimary()
-    {
-        var osPrimary = Displays.FirstOrDefault(d => d.IsOsPrimary) ?? Displays.FirstOrDefault();
-        if (osPrimary != null)
-        {
-            osPrimary.IsExcluded = false;
-            foreach (var d in Displays)
-            {
-                d.IsTargetPrimary = (d == osPrimary);
-            }
-
-            _settings.TargetPrimaryHardwareId = osPrimary.HardwareId;
-            _settings.TargetPrimaryDeviceName = osPrimary.DeviceName;
-
-            UpdateExcludedSettingsList();
-            SyncConfiguration();
-            SaveSettings();
-
-            SelectedDisplay = osPrimary;
-            OnPropertyChanged(nameof(IsSelectedPrimary));
-            OnPropertyChanged(nameof(IsSelectedExcluded));
-            OnPropertyChanged(nameof(BlockedCount));
-            OnPropertyChanged(nameof(AllowedCount));
-
-            SweepNow();
-        }
-    }
-
-    private void OnDisplaySettingChanged(DisplayInfo display, string propertyName)
-    {
-        if (propertyName == nameof(DisplayInfo.IsExcluded) && display.IsExcluded && display.IsTargetPrimary)
-        {
-            display.IsTargetPrimary = false;
-            EnsureValidTargetPrimary();
-        }
-
-        UpdateExcludedSettingsList();
-        SyncConfiguration();
-        SaveSettings();
-        OnPropertyChanged(nameof(BlockedCount));
-        OnPropertyChanged(nameof(AllowedCount));
+        OnPropertyChanged(nameof(IsPhantomDisplayGuardEnabled));
+        OnPropertyChanged(nameof(CanEnablePhantomDisplayGuard));
     }
 
     private void UpdateExcludedSettingsList()
     {
         _settings.ExcludedIdentifiers.Clear();
-        foreach (var d in Displays.Where(d => d.IsExcluded))
+        foreach (var d in Displays.Where(d => d.IsExcluded && !d.IsOsPrimary && !d.IsTargetPrimary))
         {
             if (!string.IsNullOrEmpty(d.HardwareId))
                 _settings.ExcludedIdentifiers.Add(d.HardwareId);
@@ -996,45 +692,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
         _engine.SweepAllWindows();
     }
 
-    public void IdentifyAllDisplays()
-    {
-        foreach (var display in Displays)
-        {
-            var overlay = new IdentifyOverlayWindow(display);
-            overlay.Show();
-        }
-    }
-
-    public void IdentifySingleDisplay(DisplayInfo display)
-    {
-        var overlay = new IdentifyOverlayWindow(display);
-        overlay.Show();
-    }
-
-    private void HandleWindowRelocated(RelocationLogItem item)
-    {
-        Application.Current?.Dispatcher.Invoke(() =>
-        {
-            RelocationLog.Insert(0, item);
-            if (RelocationLog.Count > 100)
-            {
-                RelocationLog.RemoveAt(RelocationLog.Count - 1);
-            }
-            RelocatedCount++;
-
-            if (_settings.ShowNotificationOnRelocate)
-            {
-                _trayService.ShowRelocationNotification(item);
-            }
-        });
-    }
-
-    public void ClearLog()
-    {
-        RelocationLog.Clear();
-        RelocatedCount = 0;
-    }
-
     private void SyncConfiguration()
     {
         _engine.UpdateConfiguration(Displays.ToList(), IsGuardActive, _settings.SweepIntervalMs);
@@ -1043,20 +700,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private void SaveSettings()
     {
         ConfigService.Save(_settings);
-    }
-
-    private void UpdateGuardStatusVisuals()
-    {
-        if (_isGuardActive)
-        {
-            StatusText = "GUARD ACTIVE";
-            StatusBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
-        }
-        else
-        {
-            StatusText = "GUARD PAUSED";
-            StatusBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
-        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

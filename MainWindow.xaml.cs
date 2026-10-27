@@ -36,24 +36,6 @@ public partial class MainWindow : Window
         var handle = new WindowInteropHelper(this).Handle;
         var source = HwndSource.FromHwnd(handle);
         source?.AddHook(WndProc);
-
-        UpdateCurrentAppMonitor();
-    }
-
-    protected override void OnLocationChanged(EventArgs e)
-    {
-        base.OnLocationChanged(e);
-        UpdateCurrentAppMonitor();
-    }
-
-    private void UpdateCurrentAppMonitor()
-    {
-        var handle = new WindowInteropHelper(this).Handle;
-        if (handle != IntPtr.Zero)
-        {
-            IntPtr hMon = Win32.MonitorFromWindow(handle, Win32.MONITOR_DEFAULTTONEAREST);
-            ViewModel.UpdateCurrentAppMonitor(hMon);
-        }
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -89,16 +71,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnToggleGuardClicked(object sender, RoutedEventArgs e)
-    {
-        ViewModel.ToggleGuard();
-    }
-
-    private void OnIdentifyAllClicked(object sender, RoutedEventArgs e)
-    {
-        ViewModel.IdentifyAllDisplays();
-    }
-
     private void OnSweepClicked(object sender, RoutedEventArgs e)
     {
         ViewModel.SweepNow();
@@ -109,42 +81,27 @@ public partial class MainWindow : Window
         ViewModel.LoadDisplays();
     }
 
-    private void OnSetSelectedAsPrimaryClicked(object sender, RoutedEventArgs e)
-    {
-        ViewModel.SetSelectedAsPrimary();
-    }
-
-    private void OnToggleSelectedBlockClicked(object sender, RoutedEventArgs e)
-    {
-        ViewModel.ToggleSelectedExcluded();
-    }
-
-    private void OnIdentifySelectedClicked(object sender, RoutedEventArgs e)
-    {
-        ViewModel.IdentifySelected();
-    }
-
-    private void OnClearLogClicked(object sender, RoutedEventArgs e)
-    {
-        ViewModel.ClearLog();
-    }
-
-    private async void OnApplyUpdateClicked(object sender, RoutedEventArgs e)
-    {
-        await ViewModel.ApplyUpdateAsync();
-    }
-
     private async void OnTogglePowerClicked(object sender, RoutedEventArgs e)
     {
         await ViewModel.TogglePowerSoundbarAsync();
     }
 
-    private void OnVolumeSliderDragStarted(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void OnVolumeSliderThumbDragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
     {
         ViewModel.OnSliderDragStarted();
     }
 
-    private async void OnVolumeSliderDragEnded(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private async void OnVolumeSliderThumbDragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        await ViewModel.OnSliderDragEndedAsync();
+    }
+
+    private void OnVolumeSliderMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        ViewModel.OnSliderDragStarted();
+    }
+
+    private async void OnVolumeSliderMouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         await ViewModel.OnSliderDragEndedAsync();
     }

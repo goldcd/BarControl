@@ -262,17 +262,9 @@ public class WindowRelocationEngine : IDisposable
             return false;
         }
 
-        // Protect BarControl itself: NEVER relocate Identify Display overlay windows
+        // Protect BarControl's own windows from relocation
         if (processId == _currentProcessId)
         {
-            var titleBuilder = new StringBuilder(256);
-            Win32.GetWindowText(hWnd, titleBuilder, 256);
-            string title = titleBuilder.ToString();
-            if (title.Equals("Identify Display", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
             long exStyleFlag = (long)Win32.GetWindowLongPtr(hWnd, Win32.GWL_EXSTYLE);
             if ((exStyleFlag & (Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_TRANSPARENT)) != 0)
             {
@@ -346,9 +338,9 @@ public class WindowRelocationEngine : IDisposable
 
         if (targetPrimary == null) return false;
 
-        // Excluded monitors can NEVER include the target primary monitor!
+        //Excluded monitors can NEVER include the target primary or OS primary monitor!
         var excludedMonitors = activeMonitors
-            .Where(m => m.IsExcluded && m.HMonitor != targetPrimary.HMonitor && m.DeviceName != targetPrimary.DeviceName)
+            .Where(m => m.IsExcluded && !m.IsOsPrimary && !m.IsTargetPrimary && m.HMonitor != targetPrimary.HMonitor && m.DeviceName != targetPrimary.DeviceName)
             .ToList();
 
         if (excludedMonitors.Count == 0) return false;
@@ -402,6 +394,16 @@ public class WindowRelocationEngine : IDisposable
             else if (isCurrentZoomed)
             {
                 _lastKnownMaximized[hWnd] = true;
+            }
+
+            if (_lastKnownSafeBounds.Count > 200)
+            {
+                var deadHandles = _lastKnownSafeBounds.Keys.Where(k => !Win32.IsWindow(k)).ToList();
+                foreach (var k in deadHandles)
+                {
+                    _lastKnownSafeBounds.TryRemove(k, out _);
+                    _lastKnownMaximized.TryRemove(k, out _);
+                }
             }
             return false;
         }

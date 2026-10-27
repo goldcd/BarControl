@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -40,9 +40,6 @@ public class DisplayInfo : INotifyPropertyChanged
             {
                 _isTargetPrimary = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(StatusDescription));
-                OnPropertyChanged(nameof(StatusBadgeBackground));
-                OnPropertyChanged(nameof(StatusBadgeForeground));
             }
         }
     }
@@ -56,9 +53,6 @@ public class DisplayInfo : INotifyPropertyChanged
             {
                 _isExcluded = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(StatusDescription));
-                OnPropertyChanged(nameof(StatusBadgeBackground));
-                OnPropertyChanged(nameof(StatusBadgeForeground));
             }
         }
     }
@@ -73,7 +67,6 @@ public class DisplayInfo : INotifyPropertyChanged
             {
                 _hasAudioEndpoint = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(Subtitle));
             }
         }
     }
@@ -102,7 +95,6 @@ public class DisplayInfo : INotifyPropertyChanged
             {
                 _audioEndpointName = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(AudioEndpointSubtitle));
             }
         }
     }
@@ -122,39 +114,10 @@ public class DisplayInfo : INotifyPropertyChanged
     }
 
     public string ResolutionString => $"{Width} × {Height}";
-    public string PositionString => $"Position: ({Left}, {Top})";
 
     public string DisplayTitle => string.IsNullOrWhiteSpace(FriendlyName)
         ? $"Display {Index} ({DeviceName})"
         : FriendlyName;
-
-    public string Subtitle => $"{ResolutionString} • {(IsOsPrimary ? "Windows Primary" : "Secondary")}{(HasAudioEndpoint ? " • 🔊 Audio" : "")}";
-
-    public string AudioEndpointSubtitle => string.IsNullOrEmpty(AudioEndpointName)
-        ? "No associated audio output"
-        : $"Prevents {AudioEndpointName} from sleeping over HDMI/DP";
-
-    public string StatusDescription
-    {
-        get
-        {
-            if (IsTargetPrimary) return "SAFE TARGET (PRIMARY)";
-            if (IsExcluded) return "OFF-LIMITS (BLOCKED)";
-            return "ALLOWED";
-        }
-    }
-
-    public string StatusBadgeBackground
-    {
-        get
-        {
-            if (IsTargetPrimary) return "#107C41"; // Fluent Green
-            if (IsExcluded) return "#C42B1C"; // Fluent Red
-            return "#3A3D40"; // Neutral grey
-        }
-    }
-
-    public string StatusBadgeForeground => "#FFFFFF";
 
     public bool ContainsPoint(int x, int y)
     {

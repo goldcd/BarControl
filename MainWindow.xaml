@@ -55,61 +55,6 @@
             </Setter>
         </Style>
 
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
-            <Setter Property="Background" Value="#0078D4"/>
-            <Setter Property="BorderBrush" Value="#1A88E0"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="btnBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="btnBorder" Property="Background" Value="#1084D9"/>
-                                <Setter TargetName="btnBorder" Property="BorderBrush" Value="#2B95E8"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="btnBorder" Property="Opacity" Value="0.45"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="AmberButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
-            <Setter Property="Background" Value="#3B2E15"/>
-            <Setter Property="BorderBrush" Value="#665022"/>
-            <Setter Property="Foreground" Value="#FBBF24"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="btnBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="btnBorder" Property="Background" Value="#523E1A"/>
-                                <Setter TargetName="btnBorder" Property="BorderBrush" Value="#806328"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <!-- Custom Dark Fluent ComboBox Item Style -->
         <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
             <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -234,37 +179,40 @@
         </Style>
         <!-- Custom Fluent Volume Slider Style -->
         <Style x:Key="FluentVolumeSliderStyle" TargetType="Slider">
-            <Setter Property="Height" Value="22"/>
+            <Setter Property="Height" Value="24"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
             <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
-                        <Grid VerticalAlignment="Center">
+                        <Grid VerticalAlignment="Center" Background="Transparent">
                             <Track x:Name="PART_Track">
                                 <Track.DecreaseRepeatButton>
-                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}" Focusable="False">
                                         <RepeatButton.Template>
                                             <ControlTemplate TargetType="RepeatButton">
-                                                <Border Background="#34D399" Height="4" CornerRadius="2,0,0,2"/>
+                                                <Border Background="Transparent" Height="18"/>
                                             </ControlTemplate>
                                         </RepeatButton.Template>
                                     </RepeatButton>
                                 </Track.DecreaseRepeatButton>
                                 <Track.IncreaseRepeatButton>
-                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
+                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}" Focusable="False">
                                         <RepeatButton.Template>
                                             <ControlTemplate TargetType="RepeatButton">
-                                                <Border Background="#2C2C34" Height="4" CornerRadius="0,2,2,0"/>
+                                                <Border Background="Transparent" Height="18"/>
                                             </ControlTemplate>
                                         </RepeatButton.Template>
                                     </RepeatButton>
                                 </Track.IncreaseRepeatButton>
                                 <Track.Thumb>
-                                    <Thumb x:Name="Thumb">
+                                    <Thumb x:Name="Thumb" Cursor="Hand">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Ellipse Width="14" Height="14" Fill="#34D399" Stroke="#FFFFFF" StrokeThickness="1.5"/>
+                                                <Grid Width="16" Height="16">
+                                                    <Ellipse Width="14" Height="14" Fill="#34D399" Stroke="#FFFFFF" StrokeThickness="1.75"/>
+                                                </Grid>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -325,7 +273,7 @@
             </Grid>
         </Border>
 
-        <!-- ================= 1: SOUNDBAR SELECTION DROPDOWN ================= -->
+        <!-- ================= 1: SOUNDBAR SELECTION & DISPLAY/AUDIO GUARDING ================= -->
         <Border Grid.Row="1"
                 Background="#1E1E22"
                 BorderBrush="#2C2C32"
@@ -333,20 +281,14 @@
                 CornerRadius="8"
                 Padding="16,14"
                 Margin="0,0,0,14">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <TextBlock Grid.Row="0"
-                           Text="SELECT SOUNDBAR / HDMI AUDIO DEVICE"
+            <StackPanel>
+                <TextBlock Text="SELECT SOUNDBAR / HDMI AUDIO DEVICE"
                            FontSize="11"
                            FontWeight="Bold"
                            Foreground="#8E8E98"
                            Margin="0,0,0,8"/>
 
-                <Grid Grid.Row="1">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -375,7 +317,54 @@
                             Click="OnRefreshClicked"
                             ToolTip="Rescan connected HDMI displays and audio endpoints"/>
                 </Grid>
-            </Grid>
+
+                <!-- Option 1: Phantom Display Guard (scoped to selected device; disabled if primary monitor is selected) -->
+                <Border Background="#25252A"
+                        CornerRadius="6"
+                        Padding="12,10"
+                        Margin="0,0,0,8"
+                        ToolTip="{Binding PhantomDisplayGuardToolTip}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Phantom Display Guard" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Prevent windows and cursors from getting lost on this soundbar display (audio continues)."
+                                       FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <CheckBox Grid.Column="1"
+                                  IsChecked="{Binding IsPhantomDisplayGuardEnabled}"
+                                  IsEnabled="{Binding CanEnablePhantomDisplayGuard}"
+                                  VerticalAlignment="Center"
+                                  Cursor="Hand"/>
+                    </Grid>
+                </Border>
+
+                <!-- Option 2: Continuous Audio Keep-Alive (scoped to selected device) -->
+                <Border Background="#25252A" CornerRadius="6" Padding="12,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Continuous Audio Keep-Alive" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Streams an inaudible signal to prevent soundbar sleep and audio cut-off/clipping."
+                                       FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <CheckBox Grid.Column="1"
+                                  IsChecked="{Binding IsAudioKeepAliveEnabled}"
+                                  VerticalAlignment="Center"
+                                  Cursor="Hand"/>
+                    </Grid>
+                </Border>
+            </StackPanel>
         </Border>
 
         <!-- ================= 2: SOUNDBAR FEATURES LIST ================= -->
@@ -424,7 +413,7 @@
                                                VerticalAlignment="Center"/>
                                 </Grid>
 
-                                <!-- Interactive Volume Slider Bar -->
+                                <!-- Interactive Volume Slider Bar (Dual-Indicator: Requested Thumb + Chasing Actual Fill & Line) -->
                                 <Grid Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -437,31 +426,85 @@
                                             Style="{StaticResource ActionButtonStyle}"
                                             Padding="6,1"
                                             FontSize="10"
-                                            Height="22"
+                                            Height="24"
                                             Margin="0,0,8,0"
                                             Click="OnVolumeDownClicked"
                                             ToolTip="Step volume down"/>
 
-                                    <Slider Grid.Column="1"
-                                            Minimum="0"
-                                            Maximum="100"
-                                            SmallChange="1"
-                                            LargeChange="5"
-                                            Value="{Binding CecVolumeSliderValue, Mode=TwoWay}"
-                                            IsEnabled="{Binding CanControlVolume}"
-                                            Style="{StaticResource FluentVolumeSliderStyle}"
-                                            PreviewMouseDown="OnVolumeSliderDragStarted"
-                                            PreviewMouseUp="OnVolumeSliderDragEnded"
-                                            VerticalAlignment="Center"
-                                            Cursor="Hand"
-                                            ToolTip="Drag to adjust soundbar volume over HDMI-CEC"/>
+                                    <Grid Grid.Column="1" VerticalAlignment="Center" Height="24">
+                                        <!-- Visual Track Container (inset by 8px on left/right so 0..100% aligns with the 16px Thumb center) -->
+                                        <Grid x:Name="VolumeTrackVisualHost" Margin="8,0,8,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                                            <!-- 1. Base Unfilled Track -->
+                                            <Border Background="#2C2C34" Height="5" CornerRadius="2.5" VerticalAlignment="Center"/>
+
+                                            <!-- 2. Requested Volume Ghost Bar (shows target while chasing upward) -->
+                                            <Border Background="#1D4E40"
+                                                    Height="5"
+                                                    CornerRadius="2.5"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Center">
+                                                <Border.Width>
+                                                    <MultiBinding Converter="{x:Static ui:PercentageToWidthConverter.Instance}">
+                                                        <Binding Path="CecVolumeSliderValue"/>
+                                                        <Binding ElementName="VolumeTrackVisualHost" Path="ActualWidth"/>
+                                                    </MultiBinding>
+                                                </Border.Width>
+                                            </Border>
+
+                                            <!-- 3. Actual Hardware Volume Fill Bar -->
+                                            <Border Background="#34D399"
+                                                    Height="5"
+                                                    CornerRadius="2.5"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Center">
+                                                <Border.Width>
+                                                    <MultiBinding Converter="{x:Static ui:PercentageToWidthConverter.Instance}">
+                                                        <Binding Path="CecActualVolumePercent"/>
+                                                        <Binding ElementName="VolumeTrackVisualHost" Path="ActualWidth"/>
+                                                    </MultiBinding>
+                                                </Border.Width>
+                                            </Border>
+
+                                            <!-- 4. Chasing Actual Volume Tick Line (illuminates where the speaker currently is while chasing) -->
+                                            <Border Width="3"
+                                                    Height="13"
+                                                    CornerRadius="1.5"
+                                                    Background="#FBBF24"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Center"
+                                                    Visibility="{Binding IsVolumeChasing, Converter={x:Static ui:BooleanToVisibilityConverter.Instance}}">
+                                                <Border.Margin>
+                                                    <MultiBinding Converter="{x:Static ui:PercentageToMarkerMarginConverter.Instance}">
+                                                        <Binding Path="CecActualVolumePercent"/>
+                                                        <Binding ElementName="VolumeTrackVisualHost" Path="ActualWidth"/>
+                                                    </MultiBinding>
+                                                </Border.Margin>
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Interactive Slider (Thumb = Requested Volume) -->
+                                        <Slider Minimum="0"
+                                                Maximum="100"
+                                                SmallChange="1"
+                                                LargeChange="5"
+                                                Value="{Binding CecVolumeSliderValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                IsEnabled="{Binding CanControlVolume}"
+                                                Style="{StaticResource FluentVolumeSliderStyle}"
+                                                Thumb.DragStarted="OnVolumeSliderThumbDragStarted"
+                                                Thumb.DragCompleted="OnVolumeSliderThumbDragCompleted"
+                                                PreviewMouseLeftButtonDown="OnVolumeSliderMouseDown"
+                                                PreviewMouseLeftButtonUp="OnVolumeSliderMouseUp"
+                                                VerticalAlignment="Center"
+                                                Cursor="Hand"
+                                                ToolTip="Drag or click anywhere on the bar to set target volume — the amber marker &amp; green bar show actual speaker volume chasing your target"/>
+                                    </Grid>
 
                                     <Button Grid.Column="2"
                                             Content="🔊"
                                             Style="{StaticResource ActionButtonStyle}"
                                             Padding="6,1"
                                             FontSize="10"
-                                            Height="22"
+                                            Height="24"
                                             Margin="8,0,0,0"
                                             Click="OnVolumeUpClicked"
                                             ToolTip="Step volume up"/>
@@ -505,61 +548,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- FEATURE CARD 2: PHANTOM DISPLAY GUARD & AUDIO KEEP-ALIVE -->
-                <Border Background="#1E1E22"
-                        BorderBrush="#2C2C32"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="16,14"
-                        Margin="0,0,0,12">
-                    <StackPanel>
-                        <TextBlock Text="🛡 Audio &amp; Phantom Display Guarding" FontSize="14.5" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-
-                        <!-- Option: Phantom Display Guard -->
-                        <Border Background="#25252A" CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="Phantom Display Guard" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
-                                    <TextBlock Text="Prevent windows and cursors from getting lost on this soundbar display (audio continues)."
-                                               FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                </StackPanel>
-
-                                <CheckBox Grid.Column="1"
-                                          IsChecked="{Binding IsPhantomDisplayGuardEnabled}"
-                                          VerticalAlignment="Center"
-                                          Cursor="Hand"/>
-                            </Grid>
-                        </Border>
-
-                        <!-- Option: Audio Keep-Alive -->
-                        <Border Background="#25252A" CornerRadius="6" Padding="12,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="Continuous Audio Keep-Alive" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
-                                    <TextBlock Text="Streams an inaudible signal to prevent soundbar sleep and audio cut-off/clipping."
-                                               FontSize="11" Foreground="#9E9EA6" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                </StackPanel>
-
-                                <CheckBox Grid.Column="1"
-                                          IsChecked="{Binding IsAudioKeepAliveEnabled}"
-                                          VerticalAlignment="Center"
-                                          Cursor="Hand"/>
-                            </Grid>
-                        </Border>
-                    </StackPanel>
-                </Border>
-
-                <!-- FEATURE CARD 3: DOLBY ATMOS & BITSTREAM VOLUME BRIDGE PREVIEW -->
+                <!-- FEATURE CARD 2: DOLBY ATMOS & BITSTREAM VOLUME BRIDGE PREVIEW -->
                 <Border Background="#1A1A1E"
                         BorderBrush="#26262B"
                         BorderThickness="1"

@@ -164,6 +164,7 @@ public partial class App : Application
     {
         LogService.LogInfo("App: OnExit triggered");
         _cecService?.Dispose();
+        _audioService?.Dispose();
         _engine?.Dispose();
         _trayService?.Dispose();
 

@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using BarControl.Core.Native;
-using BarControl.Models;
 
 namespace BarControl.Core.Tray;
 
@@ -65,11 +64,6 @@ public class TrayIconService : IDisposable
         var oldIcon = _notifyIcon.Icon;
         _notifyIcon.Icon = CreateMonitorIcon(active);
         oldIcon?.Dispose();
-    }
-
-    public void ShowRelocationNotification(RelocationLogItem item)
-    {
-        // Suppressed per user request: no balloon notifications on window relocation
     }
 
     private static Icon CreateMonitorIcon(bool withForbiddenOverlay)

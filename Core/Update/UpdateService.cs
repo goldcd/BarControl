@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -131,7 +131,7 @@ public class UpdateService
         }
 
         // Generate self-cleaning batch script to swap the binary once BarControl exits
-        string scriptPath = Path.Combine(Path.GetTempPath(), $"notm_update_{Guid.NewGuid():N}.bat");
+        string scriptPath = Path.Combine(Path.GetTempPath(), $"barcontrol_update_{Guid.NewGuid():N}.bat");
         string scriptContent = $@"@echo off
 timeout /t 1 /nobreak >nul
 :retry

@@ -134,12 +134,6 @@ public static class LibCec
     public static extern void libcec_close(IntPtr connection);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int libcec_power_on_devices(IntPtr connection, int address);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int libcec_standby_devices(IntPtr connection, int address);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern int libcec_get_device_power_status(IntPtr connection, int iLogicalAddress);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -154,15 +148,6 @@ public static class LibCec
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern byte libcec_audio_get_status(IntPtr connection);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int libcec_volume_up(IntPtr connection, int bSendRelease);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int libcec_volume_down(IntPtr connection, int bSendRelease);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int libcec_mute_audio(IntPtr connection, int bSendRelease);
-
     public const int CEC_USER_CONTROL_CODE_POWER = 0x40;
     public const int CEC_USER_CONTROL_CODE_VOLUME_UP = 0x41;
     public const int CEC_USER_CONTROL_CODE_VOLUME_DOWN = 0x42;
@@ -175,9 +160,6 @@ public static class LibCec
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern int libcec_send_key_release(IntPtr connection, int iDestination, int bWait);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int libcec_poll_device(IntPtr connection, int iLogicalAddress);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern int libcec_transmit(IntPtr connection, ref CecCommand data);
