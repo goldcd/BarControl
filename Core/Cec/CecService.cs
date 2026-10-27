@@ -499,15 +499,22 @@ public class CecService : IDisposable
                     PowerStatus = LibCec.CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON;
                     StateChanged?.Invoke();
 
-                    // Targeted attempt 1: Discrete Power On Function key (0x6D) addressed ONLY to soundbar
+                    // Targeted attempt 1: Discrete Power On Function key (0x6D) + targeted System Audio Mode Request (0x70)
                     LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, LibCec.CEC_USER_CONTROL_CODE_POWER_ON_FUNCTION, 1);
                     LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
+
+                    var samReq = CecCommand.Create(
+                        LibCec.CECDEVICE_RECORDINGDEVICE1,
+                        TargetLogicalAddress,
+                        LibCec.CEC_OPCODE_SYSTEM_AUDIO_MODE_REQUEST,
+                        CecDatapacket.Create(0x10, 0x00));
+                    LibCec.libcec_transmit(_conn, ref samReq);
 
                     Thread.Sleep(1500);
                     RefreshDeviceInfoInternal();
 
                     // Targeted attempt 2: Targeted Power button key (0x40) addressed ONLY to soundbar
-                    if (PowerStatus != LibCec.CEC_POWER_STATUS_ON)
+                    if (PowerStatus != LibCec.CEC_POWER_STATUS_ON && PowerStatus != LibCec.CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON)
                     {
                         LogService.LogInfo($"CEC: Trying targeted Power key (0x40) strictly to device {TargetLogicalAddress}...");
                         LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, LibCec.CEC_USER_CONTROL_CODE_POWER, 1);
@@ -622,6 +629,8 @@ public class CecService : IDisposable
         });
     }
 
+    private long _lastImmediateStandbyTick;
+
     private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {
         if (e.Mode == PowerModes.Suspend)
@@ -629,35 +638,36 @@ public class CecService : IDisposable
             LogService.LogInfo("CEC: Windows PowerModes.Suspend received.");
             if (AutoPowerSyncEnabled && IsConnected)
             {
-                // Windows PC going to sleep/hibernate -> turn soundbar standby
-                _ = StandbySoundbarAsync();
+                // CRITICAL: Must execute synchronously before returning from OnPowerModeChanged!
+                // If launched via Task.Run, Windows immediately suspends user-mode threads before the
+                // CEC packet is transmitted, causing the frozen task to fire later during Resume.
+                SendImmediateStandby("PC Sleep/Suspend");
             }
         }
         else if (e.Mode == PowerModes.Resume)
         {
             LogService.LogInfo("CEC: Windows PowerModes.Resume received. Re-initializing USB-CEC connection and waking soundbar...");
+
+            // Set _isActionInProgress immediately so StartBackgroundMonitor() does not race
+            // and trigger a duplicate adapter reconnect during the 1500ms USB enumeration delay.
+            _isActionInProgress = true;
+
             _ = Task.Run(async () =>
             {
-                // Allow Windows USB serial driver (COM6) a moment to re-enumerate after Hibernate/Suspend
-                await Task.Delay(1500);
-
-                // Always reconnect the USB-CEC handle on Resume because Hibernate invalidates open COM handles
-                lock (_lock)
-                {
-                    if (_isDisposed) return;
-                    _isActionInProgress = true;
-                }
-
                 try
                 {
-                    ConnectOrReconnectAdapterInternal();
+                    // Allow Windows USB serial driver a moment to re-enumerate after Hibernate/Suspend
+                    await Task.Delay(1500);
+
+                    lock (_lock)
+                    {
+                        if (_isDisposed) return;
+                        ConnectOrReconnectAdapterInternal();
+                    }
                 }
                 finally
                 {
-                    lock (_lock)
-                    {
-                        _isActionInProgress = false;
-                    }
+                    _isActionInProgress = false;
                     StateChanged?.Invoke();
                 }
 
@@ -674,24 +684,33 @@ public class CecService : IDisposable
         LogService.LogInfo($"CEC: Windows SessionEnding received (Reason={e.Reason}).");
         if (e.Reason == SessionEndReasons.SystemShutdown && AutoPowerSyncEnabled && IsConnected)
         {
-            SendImmediateStandbyForShutdown();
+            SendImmediateStandby("PC Shutdown");
         }
     }
 
     /// <summary>
-    /// Synchronously transmits discrete CEC Standby commands during Windows shutdown
-    /// before the OS terminates the process. Uses only discrete idempotent standby opcodes
-    /// so it completes in ~200ms and never toggles a sleeping soundbar back on.
+    /// Synchronously transmits discrete CEC Standby commands during Windows Sleep (Suspend) or Shutdown
+    /// before the OS suspends threads or terminates the process. Uses only discrete idempotent standby opcodes
+    /// (<Standby> 0x36 + Power Off Function 0x6C) so it completes in ~150ms without blocking or toggling a
+    /// sleeping soundbar back on.
     /// </summary>
-    public void SendImmediateStandbyForShutdown()
+    public void SendImmediateStandby(string reason = "System Power Event")
     {
         lock (_lock)
         {
             if (_isDisposed || !IsConnected || _conn == IntPtr.Zero) return;
 
+            long now = Environment.TickCount64;
+            if (now - _lastImmediateStandbyTick < 3000)
+            {
+                return;
+            }
+            _lastImmediateStandbyTick = now;
+
+            _isActionInProgress = true;
             try
             {
-                LogService.LogInfo("CEC: Sending synchronous discrete Standby (0x36 + 0x6C) for PC Shutdown...");
+                LogService.LogInfo($"CEC: Sending synchronous discrete Standby (0x36 + 0x6C) for {reason}...");
                 var standbyCmd = CecCommand.Create(
                     LibCec.CECDEVICE_RECORDINGDEVICE1,
                     TargetLogicalAddress,
@@ -704,9 +723,14 @@ public class CecService : IDisposable
             }
             catch (Exception ex)
             {
-                LogService.LogError("CEC: Error sending shutdown standby", ex);
+                LogService.LogError($"CEC: Error sending immediate standby for {reason}", ex);
+            }
+            finally
+            {
+                _isActionInProgress = false;
             }
         }
+        StateChanged?.Invoke();
     }
 
     public void Dispose()

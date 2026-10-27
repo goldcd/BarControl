@@ -1,4 +1,4 @@
-﻿# Build and publish BarControl as a standalone, zero-dependency Windows executable
+# Build and publish BarControl as a standalone, zero-dependency Windows executable
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================" -ForegroundColor Cyan
@@ -22,6 +22,10 @@ dotnet publish BarControl.csproj `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:EnableCompressionInSingleFile=true `
     -o $distDir
+
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet publish failed with exit code $LASTEXITCODE"
+}
 
 Write-Host ""
 Write-Host "Publish complete! Executable located at:" -ForegroundColor Green

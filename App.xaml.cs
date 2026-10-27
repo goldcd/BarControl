@@ -168,6 +168,16 @@ public partial class App : Application
         }
     }
 
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        LogService.LogInfo($"App: OnSessionEnding triggered (Reason={e.ReasonSessionEnding})");
+        if (e.ReasonSessionEnding == ReasonSessionEnding.Shutdown && _cecService != null && _cecService.AutoPowerSyncEnabled)
+        {
+            _cecService.SendImmediateStandby("WPF SessionEnding Shutdown");
+        }
+        base.OnSessionEnding(e);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         LogService.LogInfo("App: OnExit triggered");

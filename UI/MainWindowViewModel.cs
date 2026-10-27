@@ -187,7 +187,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
         if (_audioService != null)
         {
-            _audioService.IsEnabled = _settings.KeepAudioAwake;
+            _audioService.IsEnabled = true;
         }
 
         if (_cecService != null)
@@ -398,6 +398,10 @@ public class MainWindowViewModel : INotifyPropertyChanged
             if (SelectedSoundbar.IsExcluded != value)
             {
                 SelectedSoundbar.IsExcluded = value;
+                if (value && !IsGuardActive)
+                {
+                    IsGuardActive = true;
+                }
                 UpdateExcludedSettingsList();
                 SyncConfiguration();
                 SaveSettings();
