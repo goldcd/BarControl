@@ -24,6 +24,7 @@ public class CecService : IDisposable
     public int TargetLogicalAddress { get; set; } = LibCec.CECDEVICE_AUDIOSYSTEM;
 
     public bool IsConnected { get; private set; }
+    public bool IsConnecting => _isConnecting;
     public string? AdapterPort { get; private set; }
     public string SoundbarName { get; private set; } = "HDMI Soundbar";
     public string SoundbarVendor { get; private set; } = "Unknown";
@@ -56,15 +57,11 @@ public class CecService : IDisposable
                 if (IsConnected || _isConnecting) return false;
                 _isConnecting = true;
             }
+            StateChanged?.Invoke();
 
             try
             {
-                if (ConnectOrReconnectAdapterInternal())
-                {
-                    StartBackgroundMonitor();
-                    return true;
-                }
-                return false;
+                return ConnectOrReconnectAdapterInternal(maxDetectAttempts: 2);
             }
             finally
             {
@@ -72,6 +69,8 @@ public class CecService : IDisposable
                 {
                     _isConnecting = false;
                 }
+                // Always start the background monitor so USB hot-plug / reconnect works even if unplugged at launch
+                StartBackgroundMonitor();
                 StateChanged?.Invoke();
             }
         });
@@ -84,32 +83,72 @@ public class CecService : IDisposable
         }
     }
 
-    /// <summary>
-    /// Closes any existing libcec connection (e.g. a dead USB serial handle after Windows Hibernate)
-    /// and opens a fresh connection to the Pulse-Eight USB-CEC adapter.
-    /// </summary>
-    private bool ConnectOrReconnectAdapterInternal()
+    private static bool IsComPortPresent(string? comPort)
+    {
+        if (string.IsNullOrWhiteSpace(comPort)) return false;
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DEVICEMAP\SERIALCOMM", false);
+            if (key == null) return false;
+            foreach (var valueName in key.GetValueNames())
+            {
+                if (key.GetValue(valueName) is string port &&
+                    port.Equals(comPort, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private static bool HasAnySerialPorts()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DEVICEMAP\SERIALCOMM", false);
+            return key != null && key.ValueCount > 0;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private void DisconnectAdapterInternal()
     {
         lock (_lock)
         {
-            if (_isDisposed) return false;
-
             if (_conn != IntPtr.Zero)
             {
                 try
                 {
-                    LogService.LogInfo("CEC: Closing existing libcec handle before reconnecting...");
                     LibCec.libcec_close(_conn);
                     LibCec.libcec_destroy(_conn);
                 }
                 catch (Exception ex)
                 {
-                    LogService.LogWarn($"CEC: Warning while closing old handle: {ex.Message}");
+                    LogService.LogWarn($"CEC: Warning while closing disconnected handle: {ex.Message}");
                 }
                 _conn = IntPtr.Zero;
-                IsConnected = false;
             }
+            IsConnected = false;
+            AdapterPort = null;
+            PowerStatus = LibCec.CEC_POWER_STATUS_UNKNOWN;
         }
+    }
+
+    /// <summary>
+    /// Closes any existing libcec connection (e.g. a dead USB serial handle after Windows Hibernate)
+    /// and opens a fresh connection to the Pulse-Eight USB-CEC adapter.
+    /// </summary>
+    private bool ConnectOrReconnectAdapterInternal(int maxDetectAttempts = 3)
+    {
+        DisconnectAdapterInternal();
 
         IntPtr configPtr = Marshal.AllocHGlobal(1024);
         try
@@ -138,7 +177,6 @@ public class CecService : IDisposable
             // bActivateSource = 0 at offset 101: Never make adapter active source (prevents monitor HDMI port switching / screen blackout)
             Marshal.WriteByte(configPtr, 101, 0);
 
-            LogService.LogInfo("CEC: Initializing libcec configuration (bActivateSource=0)...");
             IntPtr conn = LibCec.libcec_initialise(configPtr);
             if (conn == IntPtr.Zero)
             {
@@ -150,11 +188,10 @@ public class CecService : IDisposable
             string? comPort = null;
             try
             {
-                // Retry adapter detection up to 4 times in case USB serial is still enumerating after Hibernate resume
-                for (int attempt = 1; attempt <= 4; attempt++)
+                int attempts = Math.Max(1, maxDetectAttempts);
+                for (int attempt = 1; attempt <= attempts; attempt++)
                 {
                     sbyte count = LibCec.libcec_detect_adapters(conn, descBuf, 10, null, 1);
-                    LogService.LogInfo($"CEC: Detected {count} adapter(s) (attempt {attempt})");
                     if (count > 0)
                     {
                         string? detectedName = Marshal.PtrToStringAnsi(descBuf + 1024);
@@ -164,7 +201,10 @@ public class CecService : IDisposable
                         }
                         break;
                     }
-                    Thread.Sleep(750);
+                    if (attempt < attempts)
+                    {
+                        Thread.Sleep(600);
+                    }
                 }
             }
             catch (Exception ex)
@@ -178,12 +218,11 @@ public class CecService : IDisposable
 
             if (string.IsNullOrEmpty(comPort))
             {
-                LogService.LogWarn("CEC: No Pulse-Eight USB-CEC adapter found on any COM port.");
                 LibCec.libcec_destroy(conn);
                 return false;
             }
 
-            LogService.LogInfo($"CEC: Opening adapter on {comPort}...");
+            LogService.LogInfo($"CEC: Opening Pulse-Eight USB-CEC adapter on {comPort}...");
             int openResult = LibCec.libcec_open(conn, comPort, 10000);
             if (openResult != 1)
             {
@@ -202,7 +241,7 @@ public class CecService : IDisposable
             LogService.LogInfo($"CEC: Connected successfully on {comPort}");
 
             // Query initial status after bus discovery settles
-            Thread.Sleep(1500);
+            Thread.Sleep(1200);
             lock (_lock)
             {
                 RefreshDeviceInfoInternal();
@@ -304,14 +343,46 @@ public class CecService : IDisposable
             {
                 try
                 {
-                    // Responsive polling (1200ms) when UI is active without saturating the CEC bus; throttled (5000ms) when hidden
-                    int pollDelay = IsUiActive ? 1200 : 5000;
+                    int pollDelay = !IsConnected ? 2000 : (IsUiActive ? 1200 : 5000);
                     await Task.Delay(pollDelay, token);
                     if (token.IsCancellationRequested) break;
 
                     // Pause background polling while the closed-loop volume chaser is actively stepping the soundbar
-                    if (VolumeController.IsChasing) continue;
+                    if (VolumeController.IsChasing || _isActionInProgress || _isConnecting) continue;
 
+                    // Case 1: Adapter is currently disconnected — check if Pulse-Eight USB-CEC was plugged back in
+                    if (!IsConnected || _conn == IntPtr.Zero)
+                    {
+                        if (!HasAnySerialPorts()) continue;
+
+                        bool reconnected = false;
+                        lock (_lock)
+                        {
+                            if (!IsConnected && !_isActionInProgress && !_isConnecting)
+                            {
+                                reconnected = ConnectOrReconnectAdapterInternal(maxDetectAttempts: 1);
+                            }
+                        }
+
+                        if (reconnected)
+                        {
+                            LogService.LogInfo($"CEC: Pulse-Eight USB-CEC adapter hot-plugged and reconnected on {AdapterPort}!");
+                            StateChanged?.Invoke();
+                        }
+                        continue;
+                    }
+
+                    // Case 2: Adapter was connected, check if its USB COM port was unplugged from Windows
+                    if (!IsComPortPresent(AdapterPort))
+                    {
+                        LogService.LogWarn($"CEC: Pulse-Eight USB-CEC adapter on {AdapterPort} was unplugged.");
+                        DisconnectAdapterInternal();
+                        StateChanged?.Invoke();
+                        continue;
+                    }
+
+                    // Case 3: Connected and present — poll live power & audio status
+                    bool notifyState = false;
                     lock (_lock)
                     {
                         if (_conn == IntPtr.Zero || !IsConnected || _isActionInProgress || VolumeController.IsChasing) continue;
@@ -322,18 +393,23 @@ public class CecService : IDisposable
                         RefreshDeviceInfoInternal();
 
                         // If the background monitor sees PowerStatus drop to UNKNOWN (153 / 0x99),
-                        // the USB serial connection was reset (e.g. after Hibernate). Reconnect automatically.
+                        // the USB serial connection was reset or unplugged. Reconnect or mark disconnected.
                         if (PowerStatus == LibCec.CEC_POWER_STATUS_UNKNOWN)
                         {
-                            LogService.LogWarn("CEC: Background monitor detected PowerStatus=UNKNOWN (153). Reconnecting USB-CEC adapter...");
-                            ConnectOrReconnectAdapterInternal();
+                            LogService.LogWarn("CEC: Background monitor detected PowerStatus=UNKNOWN (153). Checking USB-CEC adapter...");
+                            ConnectOrReconnectAdapterInternal(maxDetectAttempts: 1);
+                            notifyState = true;
                         }
-
-                        if (PowerStatus != oldPower || AudioStatus != oldAudio)
+                        else if (PowerStatus != oldPower || AudioStatus != oldAudio)
                         {
                             LogService.LogInfo($"CEC: Live state updated: Power={PowerStatus}, Vol={AudioStatus.VolumePercent}%, Muted={AudioStatus.IsMuted}");
-                            StateChanged?.Invoke();
+                            notifyState = true;
                         }
+                    }
+
+                    if (notifyState)
+                    {
+                        StateChanged?.Invoke();
                     }
                 }
                 catch (OperationCanceledException)

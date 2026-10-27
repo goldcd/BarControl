@@ -299,7 +299,7 @@
                     </ComboBox>
 
                     <Button Grid.Column="1"
-                            Content="🔄 Rescan"
+                            Content="Rescan"
                             Style="{StaticResource ActionButtonStyle}"
                             Margin="10,0,0,0"
                             Padding="12,7"
@@ -368,10 +368,11 @@
                         Margin="0,0,0,12">
                     <StackPanel>
                         <!-- Card Header -->
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,10">
-                            <TextBlock Text="⚡" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="HDMI-CEC Power Management" FontSize="14.5" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                        </StackPanel>
+                        <TextBlock Text="HDMI-CEC Power Management"
+                                   FontSize="14.5"
+                                   FontWeight="Bold"
+                                   Foreground="White"
+                                   Margin="0,0,0,10"/>
 
                         <!-- Hardware / Connection Details Bar with Interactive Volume Slider -->
                         <Border Background="#17171A" CornerRadius="6" Padding="12,9" Margin="0,0,0,12">
@@ -398,7 +399,7 @@
                                                Text="{Binding CecVolumeText}"
                                                FontSize="11.5"
                                                FontWeight="SemiBold"
-                                               Foreground="#34D399"
+                                               Foreground="{Binding CecVolumeForeground}"
                                                VerticalAlignment="Center"/>
                                 </Grid>
 
@@ -412,6 +413,7 @@
 
                                     <Button Grid.Column="0"
                                             Content="🔉"
+                                            IsEnabled="{Binding CanControlVolume}"
                                             Style="{StaticResource ActionButtonStyle}"
                                             Padding="6,1"
                                             FontSize="10"
@@ -490,6 +492,7 @@
 
                                     <Button Grid.Column="2"
                                             Content="🔊"
+                                            IsEnabled="{Binding CanControlVolume}"
                                             Style="{StaticResource ActionButtonStyle}"
                                             Padding="6,1"
                                             FontSize="10"
@@ -572,10 +575,12 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="🎵" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Dolby Atmos / Bitstream Volume Proxy" FontSize="14.5" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                            </StackPanel>
+                            <TextBlock Grid.Column="0"
+                                       Text="Dolby Atmos / Bitstream Volume Proxy"
+                                       FontSize="14.5"
+                                       FontWeight="Bold"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"/>
 
                             <Border Grid.Column="1"
                                     Background="{Binding BitstreamProxyBadgeBackground}"
@@ -657,7 +662,7 @@
 
                 <!-- Right: Sweep button -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="⚡ Sweep Windows"
+                    <Button Content="Sweep Windows"
                             Style="{StaticResource ActionButtonStyle}"
                             Click="OnSweepClicked"
                             Padding="10,4"

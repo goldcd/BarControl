@@ -2,7 +2,7 @@
 
 A lightweight Windows system tray utility designed for seamless HDMI soundbar and AV receiver integration. BarControl solves the everyday headaches of connecting an HDMI soundbar to a PC: guarding phantom displays, preventing audio sleep/clipping, bridging Dolby Atmos volume controls, and providing **HDMI-CEC hardware power & volume management** via the **Pulse-Eight USB-CEC Adapter**.
 
-![BarControl Screenshot](Assets/screenshot.png)
+![BarControl Screenshot](Assets/barcontrol-ui.png)
 
 ---
 

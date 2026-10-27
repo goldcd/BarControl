@@ -298,7 +298,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         get
         {
             if (!IsBitstreamProxyEnabled) return "DISABLED";
-            return IsBitstreamActive ? "⚡ ATMOS / BITSTREAM ACTIVE" : "STANDBY (PCM)";
+            return IsBitstreamActive ? "ATMOS / BITSTREAM ACTIVE" : "STANDBY (PCM)";
         }
     }
 
@@ -426,7 +426,16 @@ public class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public bool IsCecConnected => _cecService?.IsConnected ?? false;
-    public string CecPortName => _cecService?.AdapterPort ?? "Auto-Detecting";
+    public string CecPortName
+    {
+        get
+        {
+            if (_cecService == null) return "Not Found";
+            if (_cecService.IsConnected && !string.IsNullOrEmpty(_cecService.AdapterPort))
+                return _cecService.AdapterPort;
+            return _cecService.IsConnecting ? "Scanning..." : "Not Found";
+        }
+    }
     public string SoundbarCecName => _cecService?.SoundbarName ?? "HDMI Soundbar";
     public string SoundbarVendor => (_cecService?.SoundbarVendor is { Length: > 0 } v && v != "Unknown") ? v : "";
 
@@ -438,29 +447,43 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         get
         {
-            if (_cecService == null || !_cecService.IsConnected) return string.Empty;
+            if (_cecService == null) return "Not Found";
+            if (!_cecService.IsConnected)
+                return _cecService.IsConnecting ? "Scanning..." : "Disconnected";
+
             var st = _cecService.AudioStatus;
             if (st.VolumePercent == 127) return "Vol: --";
             int actual = _cecService.VolumeController.ActualVolume;
             int requested = _cecService.VolumeController.RequestedVolume;
             bool chasing = _cecService.VolumeController.IsChasing;
-            string icon = st.IsMuted ? "🔇 " : "🔊 ";
             string muteSuffix = st.IsMuted ? " (Muted)" : "";
 
             if (chasing && Math.Abs(requested - actual) > 1)
             {
-                return $"{icon}Vol: {actual}% → {requested}%{muteSuffix}";
+                return $"Vol: {actual}% → {requested}%{muteSuffix}";
             }
-            return $"{icon}Vol: {actual}%{muteSuffix}";
+            return $"Vol: {actual}%{muteSuffix}";
         }
     }
+
+    public Brush CecVolumeForeground =>
+        IsCecConnected
+            ? new SolidColorBrush(Color.FromRgb(52, 211, 153))   // Emerald Green (#34D399)
+            : new SolidColorBrush(Color.FromRgb(251, 191, 36));  // Amber Warning (#FBBF24)
 
     public string PowerToggleButtonText
     {
         get
         {
-            if (_cecService == null || !_cecService.IsConnected)
-                return "Connecting...";
+            if (_cecService == null)
+                return "Pulse-Eight USB-CEC Adapter Not Found";
+
+            if (!_cecService.IsConnected)
+            {
+                return _cecService.IsConnecting
+                    ? "Connecting to Pulse-Eight USB-CEC..."
+                    : "Pulse-Eight USB-CEC Not Found — Waiting for USB...";
+            }
 
             if (IsOperatingPower)
             {
@@ -473,11 +496,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
             return _cecService.PowerStatus switch
             {
-                LibCec.CEC_POWER_STATUS_ON => "🌙 Turn Off",
-                LibCec.CEC_POWER_STATUS_STANDBY => "⚡ Turn On",
+                LibCec.CEC_POWER_STATUS_ON => "Turn Off",
+                LibCec.CEC_POWER_STATUS_STANDBY => "Turn On",
                 LibCec.CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON => "Powering On...",
                 LibCec.CEC_POWER_STATUS_IN_TRANSITION_ON_TO_STANDBY => "Entering Standby...",
-                _ => "⚡ Turn On"
+                _ => "Turn On"
             };
         }
     }
@@ -688,6 +711,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(PowerToggleButtonBorderBrush));
         OnPropertyChanged(nameof(PowerToggleButtonForeground));
         OnPropertyChanged(nameof(CecVolumeText));
+        OnPropertyChanged(nameof(CecVolumeForeground));
         OnPropertyChanged(nameof(CecActualVolumePercent));
         OnPropertyChanged(nameof(CecRequestedVolumePercent));
         OnPropertyChanged(nameof(IsVolumeChasing));
