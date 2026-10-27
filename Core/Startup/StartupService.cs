@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using Microsoft.Win32;
 
@@ -62,6 +62,15 @@ public static class StartupService
             if (v == null) return;
 
             string versionStr = $"{v.Major}.{v.Minor}.{v.Build}";
+
+            // Never downgrade the registered DisplayVersion if an older dev build is run outside the install folder
+            if (key.GetValue("DisplayVersion") is string existingStr &&
+                Version.TryParse(existingStr, out var existingVer) &&
+                existingVer > new Version(v.Major, v.Minor, v.Build))
+            {
+                return;
+            }
+
             key.SetValue("DisplayVersion", versionStr);
         }
         catch

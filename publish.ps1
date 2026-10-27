@@ -14,6 +14,18 @@ if (Test-Path $distDir) {
     Remove-Item -Recurse -Force $distDir
 }
 
+# Automatically determine version from latest git tag if available
+$versionArg = @()
+try {
+    $gitTag = (git describe --tags --abbrev=0 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $gitTag -match '^[vV\.]*(\d+\.\d+(?:\.\d+)?)') {
+        $cleanVer = $Matches[1]
+        if ($cleanVer -match '^\d+\.\d+$') { $cleanVer = "$cleanVer.0" }
+        Write-Host "Building version $cleanVer (from git tag $gitTag)..." -ForegroundColor Cyan
+        $versionArg = @("-p:Version=$cleanVer")
+    }
+} catch {}
+
 dotnet publish BarControl.csproj `
     -c Release `
     -r win-x64 `
@@ -21,6 +33,7 @@ dotnet publish BarControl.csproj `
     -p:PublishSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:EnableCompressionInSingleFile=true `
+    @versionArg `
     -o $distDir
 
 if ($LASTEXITCODE -ne 0) {

@@ -53,7 +53,8 @@ if (-not $hasBinary) {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
         Invoke-WebRequest -Uri $releaseUrl -OutFile $targetExe -UseBasicParsing
         $hasBinary = $true
-    } catch {
+    }
+    catch {
         Write-Host "Prebuilt release binary not yet published on GitHub Releases." -ForegroundColor Yellow
         Write-Host "Attempting fallback build from GitHub repository archive..." -ForegroundColor Gray
 
@@ -79,7 +80,8 @@ if (-not $hasBinary) {
                     Copy-Item -Path $builtExe -Destination $targetExe -Force
                     $hasBinary = $true
                 }
-            } finally {
+            }
+            finally {
                 if (Test-Path $tempZip) { Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue }
                 if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue }
             }
@@ -101,10 +103,12 @@ Start-Sleep -Milliseconds 500
 $iconPath = Join-Path $installDir "app.ico"
 if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot "Assets\app.ico"))) {
     Copy-Item -Path (Join-Path $PSScriptRoot "Assets\app.ico") -Destination $iconPath -Force
-} else {
+}
+else {
     try {
         Invoke-WebRequest -Uri "$rawBaseUrl/Assets/app.ico" -OutFile $iconPath -UseBasicParsing -ErrorAction SilentlyContinue
-    } catch {}
+    }
+    catch {}
 }
 
 # Install uninstaller scripts
@@ -113,11 +117,13 @@ $uninstallCmd = Join-Path $installDir "uninstall.cmd"
 if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot "uninstall.ps1"))) {
     Copy-Item -Path (Join-Path $PSScriptRoot "uninstall.ps1") -Destination $uninstallPs1 -Force
     Copy-Item -Path (Join-Path $PSScriptRoot "uninstall.cmd") -Destination $uninstallCmd -Force
-} else {
+}
+else {
     try {
         Invoke-WebRequest -Uri "$rawBaseUrl/uninstall.ps1" -OutFile $uninstallPs1 -UseBasicParsing -ErrorAction SilentlyContinue
         Invoke-WebRequest -Uri "$rawBaseUrl/uninstall.cmd" -OutFile $uninstallCmd -UseBasicParsing -ErrorAction SilentlyContinue
-    } catch {}
+    }
+    catch {}
 }
 
 # Create Start Menu Shortcut
@@ -132,7 +138,8 @@ $shortcut.WorkingDirectory = $installDir
 $shortcut.Description = "BarControl - Soundbar & HDMI-CEC Control"
 if (Test-Path $iconPath) {
     $shortcut.IconLocation = $iconPath
-} else {
+}
+else {
     $shortcut.IconLocation = "$targetExe,0"
 }
 $shortcut.Save()
@@ -145,7 +152,7 @@ if (-not (Test-Path $uninstallRegKey)) {
 }
 
 # Extract actual version from installed executable
-$appVersion = "0.1.0"
+$appVersion = "0.1.8"
 if (Test-Path $targetExe) {
     try {
         $rawVer = (Get-Item $targetExe).VersionInfo.ProductVersion
@@ -154,8 +161,11 @@ if (Test-Path $targetExe) {
             $cleanVer = $rawVer.Split('+')[0].Trim().TrimStart('v', 'V')
             if ($cleanVer) { $appVersion = $cleanVer }
         }
-    } catch { }
+    }
+    catch { }
 }
+
+Write-Host "Registering BarControl v$appVersion in Windows Installed Apps..." -ForegroundColor Gray
 
 Set-ItemProperty -Path $uninstallRegKey -Name "DisplayName" -Value "BarControl - Soundbar & HDMI-CEC Control"
 Set-ItemProperty -Path $uninstallRegKey -Name "DisplayVersion" -Value $appVersion

@@ -16,8 +16,28 @@
     <Title>BarControl - Soundbar Management &amp; HDMI-CEC Control</Title>
     <Description>BarControl - Soundbar Management &amp; HDMI-CEC Control</Description>
     <Company>goldcd</Company>
-    <Version>0.1.0</Version>
+    <Version>0.1.8</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
+
+  <!-- Automatically stamp Version from the latest Git tag (e.g. v0.1.8 -> 0.1.8) on local builds -->
+  <Target Name="SetVersionFromGitTag" BeforeTargets="PrepareForBuild;GetAssemblyVersion;GenerateAssemblyInfo">
+    <Exec Command="git describe --tags --abbrev=0"
+          ConsoleToMSBuild="true"
+          StandardErrorImportance="low"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitLatestTag" />
+      <Output TaskParameter="ExitCode" PropertyName="GitTagExitCode" />
+    </Exec>
+    <PropertyGroup Condition="'$(GitTagExitCode)' == '0' AND '$(GitLatestTag)' != ''">
+      <CleanGitVersion>$([System.Text.RegularExpressions.Regex]::Match('$(GitLatestTag)', '(\d+\.\d+(?:\.\d+)?)').Groups[1].Value)</CleanGitVersion>
+      <CleanGitVersion Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(CleanGitVersion)', '^\d+\.\d+$'))">$(CleanGitVersion).0</CleanGitVersion>
+      <Version Condition="'$(CleanGitVersion)' != ''">$(CleanGitVersion)</Version>
+      <AssemblyVersion Condition="'$(CleanGitVersion)' != ''">$(CleanGitVersion).0</AssemblyVersion>
+      <FileVersion Condition="'$(CleanGitVersion)' != ''">$(CleanGitVersion).0</FileVersion>
+      <InformationalVersion Condition="'$(CleanGitVersion)' != ''">$(CleanGitVersion)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="System.Management" Version="10.0.13" />
