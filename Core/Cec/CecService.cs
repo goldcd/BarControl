@@ -263,6 +263,7 @@ public class CecService : IDisposable
     private void RefreshDeviceInfoInternal()
     {
         if (_conn == IntPtr.Zero) return;
+        if (VolumeController.IsActiveOrCooldown) return;
 
         try
         {
@@ -277,8 +278,8 @@ public class CecService : IDisposable
             int pwr = LibCec.libcec_get_device_power_status(_conn, TargetLogicalAddress);
             PowerStatus = pwr;
 
-            // Yield immediately if the user started dragging the volume slider during the power query
-            if (VolumeController.IsChasing) return;
+            // Yield immediately if the user started adjusting volume during the power query
+            if (VolumeController.IsActiveOrCooldown) return;
 
             // 2. Query audio status directly from the wire (0x71) strictly to TargetLogicalAddress
             var audioCmd = CecCommand.Create(
@@ -343,12 +344,12 @@ public class CecService : IDisposable
             {
                 try
                 {
-                    int pollDelay = !IsConnected ? 2000 : (IsUiActive ? 1200 : 5000);
+                    int pollDelay = !IsConnected ? 2000 : (IsUiActive ? 1500 : 5000);
                     await Task.Delay(pollDelay, token);
                     if (token.IsCancellationRequested) break;
 
-                    // Pause background polling while the closed-loop volume chaser is actively stepping the soundbar
-                    if (VolumeController.IsChasing || _isActionInProgress || _isConnecting) continue;
+                    // Pause background polling completely while volume is being adjusted or in post-adjustment cooldown
+                    if (VolumeController.IsActiveOrCooldown || _isActionInProgress || _isConnecting) continue;
 
                     // Case 1: Adapter is currently disconnected — check if Pulse-Eight USB-CEC was plugged back in
                     if (!IsConnected || _conn == IntPtr.Zero)
@@ -385,7 +386,7 @@ public class CecService : IDisposable
                     bool notifyState = false;
                     lock (_lock)
                     {
-                        if (_conn == IntPtr.Zero || !IsConnected || _isActionInProgress || VolumeController.IsChasing) continue;
+                        if (_conn == IntPtr.Zero || !IsConnected || _isActionInProgress || VolumeController.IsActiveOrCooldown) continue;
 
                         int oldPower = PowerStatus;
                         var oldAudio = AudioStatus;
@@ -425,53 +426,61 @@ public class CecService : IDisposable
     }
 
     /// <summary>
-    /// Sends a burst of discrete Volume Up or Down keypress/release pairs and queries the updated
-    /// audio status (0x71) directly from the soundbar over the wire. Used by CecVolumeController's closed-loop chaser.
+    /// Sends a calibrated burst of Volume Up or Down raw CEC keypress frames (0x44) followed by a single
+    /// release frame (0x45), then queries <Give Audio Status> (0x71) and waits for the soundbar's fresh
+    /// <Report Audio Status> (0x7A) response.
     /// </summary>
-    internal CecAudioStatus ExecuteVolumeStepBurst(bool up, int steps)
+    internal CecAudioStatus ExecuteVolumeStepBurst(bool up, int steps, int startVolume, Action<int>? onEstimatedProgress = null)
     {
         lock (_lock)
         {
             if (_conn == IntPtr.Zero || !IsConnected) return new CecAudioStatus(false, -1);
 
-            int code = up ? LibCec.CEC_USER_CONTROL_CODE_VOLUME_UP : LibCec.CEC_USER_CONTROL_CODE_VOLUME_DOWN;
-            int count = Math.Clamp(steps, 1, 8);
+            byte keyCode = (byte)(up ? LibCec.CEC_USER_CONTROL_CODE_VOLUME_UP : LibCec.CEC_USER_CONTROL_CODE_VOLUME_DOWN);
+            int count = Math.Clamp(steps, 1, 12);
+
+            var pressCmd = CecCommand.Create(
+                LibCec.CECDEVICE_RECORDINGDEVICE1,
+                TargetLogicalAddress,
+                LibCec.CEC_OPCODE_USER_CONTROL_PRESSED,
+                CecDatapacket.Create(keyCode));
+
+            var releaseCmd = CecCommand.Create(
+                LibCec.CECDEVICE_RECORDINGDEVICE1,
+                TargetLogicalAddress,
+                LibCec.CEC_OPCODE_USER_CONTROL_RELEASE);
 
             for (int i = 0; i < count; i++)
             {
-                // If user dragged slider back the other way mid-burst, stop stepping immediately
-                int currentReq = VolumeController.RequestedVolume;
-                int currentAct = VolumeController.ActualVolume;
-                if ((up && currentReq <= currentAct) || (!up && currentReq >= currentAct))
+                LibCec.libcec_transmit(_conn, ref pressCmd);
+
+                // Estimate hardware progress based on calibrated Panasonic SoundSlayer key-repeat curve:
+                // - 1 press = 1%, 2 presses = 2%
+                // - 3..4 presses bridge the ~450ms initial hold delay (2..3%)
+                // - 5+ presses accelerate at ~1.8% per press in hardware repeat mode
+                int estDelta = count <= 2
+                    ? (i + 1)
+                    : (i == 0 ? 1 : (i == 1 ? 1 : (i == 2 ? 2 : (i == 3 ? 3 : 3 + (int)Math.Round((i - 3) * 1.8)))));
+                int estVol = Math.Clamp(startVolume + (up ? estDelta : -estDelta), 0, 100);
+                onEstimatedProgress?.Invoke(estVol);
+
+                // Check if user moved slider closer or reversed direction mid-burst so we can stop immediately
+                int req = VolumeController.RequestedVolume;
+                if ((up && estVol >= req) || (!up && estVol <= req))
                 {
                     break;
                 }
 
-                LibCec.libcec_send_keypress(_conn, TargetLogicalAddress, code, 1);
-                LibCec.libcec_send_key_release(_conn, TargetLogicalAddress, 1);
                 if (i < count - 1)
                 {
-                    Thread.Sleep(15);
+                    Thread.Sleep(115);
                 }
             }
 
-            // Explicitly query <Give Audio Status> (0x71) from the wire so AudioStatus reflects the new hardware volume immediately
-            var audioCmd = CecCommand.Create(
-                LibCec.CECDEVICE_RECORDINGDEVICE1,
-                TargetLogicalAddress,
-                LibCec.CEC_OPCODE_GIVE_AUDIO_STATUS);
-            LibCec.libcec_transmit(_conn, ref audioCmd);
-            Thread.Sleep(75);
+            LibCec.libcec_transmit(_conn, ref releaseCmd);
 
-            byte rawAudio = LibCec.libcec_audio_get_status(_conn);
-            bool isMuted = (rawAudio & 0x80) != 0;
-            int vol = rawAudio & 0x7F;
-            if (vol >= 0 && vol <= 100)
-            {
-                AudioStatus = new CecAudioStatus(isMuted, vol);
-            }
-
-            return AudioStatus;
+            // Allow soundbar DSP to settle after key release, then query fresh <Report Audio Status> (0x7A)
+            return QueryAudioStatusFromWireInternal(settleMs: 50);
         }
     }
 
@@ -482,24 +491,55 @@ public class CecService : IDisposable
     {
         lock (_lock)
         {
-            if (_conn == IntPtr.Zero || !IsConnected) return new CecAudioStatus(false, -1);
-
-            var audioCmd = CecCommand.Create(
-                LibCec.CECDEVICE_RECORDINGDEVICE1,
-                TargetLogicalAddress,
-                LibCec.CEC_OPCODE_GIVE_AUDIO_STATUS);
-            LibCec.libcec_transmit(_conn, ref audioCmd);
-
-            Thread.Sleep(90);
-            byte rawAudio = LibCec.libcec_audio_get_status(_conn);
-            bool isMuted = (rawAudio & 0x80) != 0;
-            int vol = rawAudio & 0x7F;
-            if (vol >= 0 && vol <= 100)
-            {
-                AudioStatus = new CecAudioStatus(isMuted, vol);
-            }
-            return AudioStatus;
+            return QueryAudioStatusFromWireInternal(settleMs: 0);
         }
+    }
+
+    private CecAudioStatus QueryAudioStatusFromWireInternal(int settleMs)
+    {
+        if (_conn == IntPtr.Zero || !IsConnected) return new CecAudioStatus(false, -1);
+
+        if (settleMs > 0)
+        {
+            Thread.Sleep(settleMs);
+        }
+
+        byte beforeRaw = LibCec.libcec_audio_get_status(_conn);
+        int beforeVol = beforeRaw & 0x7F;
+
+        var audioCmd = CecCommand.Create(
+            LibCec.CECDEVICE_RECORDINGDEVICE1,
+            TargetLogicalAddress,
+            LibCec.CEC_OPCODE_GIVE_AUDIO_STATUS);
+        LibCec.libcec_transmit(_conn, ref audioCmd);
+
+        // Hardware benchmark shows 0x7A reply arrives ~108ms after 0x71 transmit completes.
+        // Poll every 4ms up to 175ms; exit early as soon as the cached volume changes.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        byte rawAudio = beforeRaw;
+        while (sw.ElapsedMilliseconds < 175)
+        {
+            rawAudio = LibCec.libcec_audio_get_status(_conn);
+            int curVol = rawAudio & 0x7F;
+            if (curVol >= 0 && curVol <= 100 && curVol != beforeVol)
+            {
+                break;
+            }
+            // If volume genuinely didn't change, 125ms is sufficient for the 0x7A frame to have arrived
+            if (sw.ElapsedMilliseconds >= 125 && curVol == beforeVol)
+            {
+                break;
+            }
+            Thread.Sleep(4);
+        }
+
+        bool isMuted = (rawAudio & 0x80) != 0;
+        int vol = rawAudio & 0x7F;
+        if (vol >= 0 && vol <= 100)
+        {
+            AudioStatus = new CecAudioStatus(isMuted, vol);
+        }
+        return AudioStatus;
     }
 
     public Task StepVolumeAsync(bool up)

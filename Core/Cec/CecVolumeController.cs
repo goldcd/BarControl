@@ -24,6 +24,8 @@ public class CecVolumeController : IDisposable
     private int _requestedVolume;
     private bool _isMuted;
     private bool _isChasing;
+    private volatile bool _isUserInteracting;
+    private long _lastActivityTick;
 
     /// <summary>
     /// Current volume percentage reported by the soundbar hardware (0..100).
@@ -58,6 +60,30 @@ public class CecVolumeController : IDisposable
     }
 
     /// <summary>
+    /// True while the user is dragging the slider, the chaser is actively stepping volume,
+    /// or within a 2-second cooldown after volume adjustment finishes so background polling
+    /// never contends with the CEC bus during volume changes.
+    /// </summary>
+    public bool IsActiveOrCooldown
+    {
+        get
+        {
+            if (_isUserInteracting) return true;
+            lock (_stateLock)
+            {
+                if (_isChasing) return true;
+            }
+            return (Environment.TickCount64 - Interlocked.Read(ref _lastActivityTick)) < 2000;
+        }
+    }
+
+    public void SetUserInteracting(bool interacting)
+    {
+        _isUserInteracting = interacting;
+        Interlocked.Exchange(ref _lastActivityTick, Environment.TickCount64);
+    }
+
+    /// <summary>
     /// Raised whenever ActualVolume, RequestedVolume, IsMuted, or IsChasing changes.
     /// </summary>
     public event Action? VolumeStateChanged;
@@ -78,6 +104,7 @@ public class CecVolumeController : IDisposable
     {
         int clamped = Math.Clamp(targetPercent, 0, 100);
         bool changed = false;
+        Interlocked.Exchange(ref _lastActivityTick, Environment.TickCount64);
 
         lock (_stateLock)
         {
@@ -196,6 +223,34 @@ public class CecVolumeController : IDisposable
         }
     }
 
+    private void UpdateEstimatedActualVolume(int estimatedVolume)
+    {
+        bool changed = false;
+        lock (_stateLock)
+        {
+            if (_actualVolume != estimatedVolume)
+            {
+                _actualVolume = estimatedVolume;
+                changed = true;
+            }
+        }
+        if (changed)
+        {
+            VolumeStateChanged?.Invoke();
+        }
+    }
+
+    private static int CalculateOptimalPressCount(int absDiff)
+    {
+        if (absDiff <= 1) return 1;
+        if (absDiff == 2) return 2;
+        // Hardware calibration on Panasonic SoundSlayer:
+        // - 1 press = 1%, 2 presses = 2%
+        // - 3..4 presses cross the ~450ms key-repeat hold threshold (~3%)
+        // - 5..12 presses accelerate in hardware repeat mode (e.g. 12 presses = ~16-18% in a single burst)
+        return Math.Clamp((int)Math.Round(absDiff * 0.62) + 2, 4, 12);
+    }
+
     private async Task RunChaseSessionAsync(CancellationToken token)
     {
         int stalledCount = 0;
@@ -219,42 +274,38 @@ public class CecVolumeController : IDisposable
                 }
 
                 int diff = target - actual;
-
-                // Soundbars often have 50 internal steps (2% per step).
-                // Allow a 1% deadband if we aren't targeting 0% or 100% and have already stepped,
-                // or stop immediately when diff == 0.
-                if (diff == 0 || (Math.Abs(diff) == 1 && target != 0 && target != 100 && lastDirection != 0))
+                if (diff == 0)
                 {
                     break;
                 }
 
                 int direction = diff > 0 ? 1 : -1;
 
-                // If direction reversed right after a 1-step overshoot (e.g. soundbar jumped from 64% to 66% for target 65%),
-                // we have converged as closely as the hardware step resolution allows.
-                if (lastDirection != 0 && direction != lastDirection && Math.Abs(diff) <= 2)
+                // Guard against ping-pong oscillation if a soundbar only supports 2% steps and just reversed across target
+                if (lastDirection != 0 && direction != lastDirection && Math.Abs(diff) == 1 && stalledCount > 0)
                 {
                     LogService.LogInfo($"CEC Volume Chaser: Converged at {actual}% (target {target}%, hardware step resolution reached).");
                     break;
                 }
 
-                // Adaptive burst sizing:
-                // - Large gap (>= 18%): up to 7 steps per burst
-                // - Medium-large gap (10..17%): 4 steps per burst
-                // - Medium gap (5..9%): 2 steps per burst
-                // - Close gap (1..4%): 1 step for fine landing
                 int absDiff = Math.Abs(diff);
-                int burstSteps = absDiff >= 18 ? 7 : (absDiff >= 10 ? 4 : (absDiff >= 5 ? 2 : 1));
+                int burstSteps = CalculateOptimalPressCount(absDiff);
+                int burstStartVolume = actual;
 
-                var updatedStatus = _cecService.ExecuteVolumeStepBurst(direction > 0, burstSteps);
+                Interlocked.Exchange(ref _lastActivityTick, Environment.TickCount64);
+                var updatedStatus = _cecService.ExecuteVolumeStepBurst(
+                    direction > 0,
+                    burstSteps,
+                    burstStartVolume,
+                    UpdateEstimatedActualVolume);
+                Interlocked.Exchange(ref _lastActivityTick, Environment.TickCount64);
 
                 if (updatedStatus.VolumePercent >= 0 && updatedStatus.VolumePercent <= 100)
                 {
-                    int previousActual = actual;
                     OnHardwareAudioStatusReported(updatedStatus, syncRequestedIfIdle: false);
                     actual = updatedStatus.VolumePercent;
 
-                    if (actual == previousActual)
+                    if (actual == burstStartVolume)
                     {
                         stalledCount++;
                         if (stalledCount >= 3)
@@ -275,12 +326,13 @@ public class CecVolumeController : IDisposable
 
                 lastDirection = direction;
 
-                // Brief yield so UI updates smoothly and user slider movements can preempt next iteration
+                // Minimal yield so UI updates smoothly and user slider movements can preempt next iteration
                 await Task.Delay(5, token);
             }
         }
         finally
         {
+            Interlocked.Exchange(ref _lastActivityTick, Environment.TickCount64);
             lock (_stateLock)
             {
                 _isChasing = false;

@@ -653,11 +653,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
     public void OnSliderDragStarted()
     {
         _isUserDraggingSlider = true;
+        _cecService?.VolumeController.SetUserInteracting(true);
     }
 
     public Task OnSliderDragEndedAsync()
     {
         _isUserDraggingSlider = false;
+        _cecService?.VolumeController.SetUserInteracting(false);
         if (_cecService != null && CanControlVolume)
         {
             _cecService.VolumeController.RequestVolume(_sliderVolumePercent);
