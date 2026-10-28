@@ -33,6 +33,11 @@ A lightweight Windows system tray utility designed for seamless HDMI soundbar an
 
 ## 2. How to Use It
 
+### Requirements
+- **Windows 10 / 11 (x64)**: Fully self-contained — both the .NET 8 runtime and native `cec.dll` library are bundled directly inside `BarControl.exe`.
+- **For HDMI-CEC Power & Volume Features**: Requires a **[Pulse-Eight USB-CEC Adapter](https://www.pulse-eight.com/p/104/usb-hdmi-cec-adapter)** connected between your PC and soundbar, with the Pulse-Eight USB serial driver installed so the adapter appears as a COM port in Windows Device Manager (you do *not* need the Pulse-Eight tray application or Kodi installed).
+  *(Note: Phantom Display Guard and Continuous Audio Keep-Alive work with any HDMI soundbar even without a USB-CEC adapter.)*
+
 ### ⚡ Getting Started
 
 #### Option A: One-Line PowerShell Installer (Recommended)
@@ -172,7 +177,9 @@ BarControl/
 ```
 
 ## Acknowledgements
+- [Pulse-Eight libCEC](https://github.com/Pulse-Eight/libcec) — for the open-source USB-CEC communication library (`cec.dll`) that powers hardware HDMI-CEC discovery and frame transmission.
 - [SoundKeeper by VEG (vrubleg)](https://github.com/vrubleg/soundkeeper) — for the WASAPI audio keep-alive concept and the `Fluctuate` stream design that keeps digital audio devices awake without audible sound.
 
 ## License
-MIT License.
+- **BarControl** source code is licensed under the [MIT License](LICENSE).
+- Bundles unmodified `cec.dll` from [Pulse-Eight libCEC](https://github.com/Pulse-Eight/libcec), which is licensed under the [GNU General Public License v2.0 (GPL-2.0-or-later)](https://github.com/Pulse-Eight/libcec/blob/master/COPYING).

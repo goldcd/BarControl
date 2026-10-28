@@ -1,4 +1,4 @@
-﻿# BarControl Windows Uninstaller Script
+# BarControl Windows Uninstaller Script
 $ErrorActionPreference = "SilentlyContinue"
 
 Write-Host "==========================================" -ForegroundColor Cyan
@@ -24,6 +24,12 @@ Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" 
 # Remove Installed Apps registry key
 Write-Host "Removing Windows Installed Apps registration..." -ForegroundColor Gray
 Remove-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\BarControl" -Recurse -Force -ErrorAction SilentlyContinue
+
+# Remove extracted native runtime cache
+$nativeCacheDir = Join-Path $env:LOCALAPPDATA "BarControl\native"
+if (Test-Path $nativeCacheDir) {
+    Remove-Item -Path $nativeCacheDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 # Remove Installation Directory
 $installDir = Join-Path $env:LOCALAPPDATA "Programs\BarControl"

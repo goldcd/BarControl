@@ -97,19 +97,56 @@ public static class LibCec
         if (libraryName.Equals(DllName, StringComparison.OrdinalIgnoreCase))
         {
             string baseDir = AppContext.BaseDirectory;
-            string[] probePaths =
+            string[] localProbePaths =
             {
                 Path.Combine(baseDir, "runtimes", "win-x64", "native", "cec.dll"),
-                Path.Combine(baseDir, "cec.dll"),
-                @"C:\Program Files (x86)\Pulse-Eight\USB-CEC Adapter\x64\cec.dll"
+                Path.Combine(baseDir, "cec.dll")
             };
 
-            foreach (var path in probePaths)
+            foreach (var path in localProbePaths)
             {
                 if (File.Exists(path) && NativeLibrary.TryLoad(path, out IntPtr handle))
                 {
                     return handle;
                 }
+            }
+
+            // Extract bundled cec.dll from embedded resource into %LocalAppData%\BarControl\native\cec.dll
+            // so single-file BarControl.exe works out-of-the-box without requiring external libCEC installation.
+            try
+            {
+                string extractDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "BarControl",
+                    "native");
+                Directory.CreateDirectory(extractDir);
+                string extractedDllPath = Path.Combine(extractDir, "cec.dll");
+
+                using Stream? resStream = assembly.GetManifestResourceStream("BarControl.Native.cec.dll");
+                if (resStream != null)
+                {
+                    bool needsWrite = !File.Exists(extractedDllPath) || new FileInfo(extractedDllPath).Length != resStream.Length;
+                    if (needsWrite)
+                    {
+                        using var fs = new FileStream(extractedDllPath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                        resStream.CopyTo(fs);
+                    }
+
+                    if (NativeLibrary.TryLoad(extractedDllPath, out IntPtr embeddedHandle))
+                    {
+                        return embeddedHandle;
+                    }
+                }
+            }
+            catch
+            {
+                // Fall through to system-wide fallback if extraction or load fails
+            }
+
+            string systemFallbackPath = @"C:\Program Files (x86)\Pulse-Eight\USB-CEC Adapter\x64\cec.dll";
+            if (File.Exists(systemFallbackPath) && NativeLibrary.TryLoad(systemFallbackPath, out IntPtr sysHandle))
+            {
+                return sysHandle;
             }
         }
         return IntPtr.Zero;
