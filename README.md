@@ -38,7 +38,7 @@ A lightweight Windows system tray utility designed for seamless HDMI soundbar an
 - **For HDMI-CEC Power & Volume Features**: Requires a **[Pulse-Eight USB-CEC Adapter](https://www.pulse-eight.com/p/104/usb-hdmi-cec-adapter)** connected between your PC and soundbar, with the Pulse-Eight USB serial driver installed so the adapter appears as a COM port in Windows Device Manager (you do *not* need the Pulse-Eight tray application or Kodi installed).
   *(Note: Phantom Display Guard and Continuous Audio Keep-Alive work with any HDMI soundbar even without a USB-CEC adapter.)*
 
-### ⚡ Getting Started
+### Getting Started
 
 #### Option A: One-Line PowerShell Installer (Recommended)
 Open PowerShell (no administrator rights required) and paste:
