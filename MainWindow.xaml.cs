@@ -120,4 +120,36 @@ public partial class MainWindow : Window
     {
         await ViewModel.ApplyUpdateAsync();
     }
+
+    private void OnGitHubLinkClicked(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://github.com/goldcd/barcontrol",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.LogService.LogError("Failed to open GitHub link", ex);
+        }
+    }
+
+    private void OnBuyMeACoffeeLinkClicked(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://buymeacoffee.com/goldcd",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.LogService.LogError("Failed to open BuyMeACoffee link", ex);
+        }
+    }
 }

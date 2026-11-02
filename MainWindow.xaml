@@ -55,6 +55,39 @@
             </Setter>
         </Style>
 
+        <!-- Icon-Only Footer Link Button Style -->
+        <Style x:Key="FooterIconButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="#383842"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#2D2D34"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#52525E"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#1C1C20"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Custom Dark Fluent ComboBox Item Style -->
         <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
             <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -660,8 +693,32 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Right: Sweep button -->
+                <!-- Right: External Links & Sweep button -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- GitHub Repository Link -->
+                    <Button Style="{StaticResource FooterIconButton}"
+                            Click="OnGitHubLinkClicked"
+                            ToolTip="View GitHub Repository"
+                            Margin="0,0,6,0">
+                        <!-- GitHub Invertocat Vector (24x24 viewBox) -->
+                        <Path Fill="#A1A1AA"
+                              Width="14" Height="14"
+                              Stretch="Uniform"
+                              Data="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+                    </Button>
+
+                    <!-- Buy Me a Coffee Link -->
+                    <Button Style="{StaticResource FooterIconButton}"
+                            Click="OnBuyMeACoffeeLinkClicked"
+                            ToolTip="Buy Me a Coffee"
+                            Margin="0,0,10,0">
+                        <!-- Buy Me a Coffee Cup Vector (24x24 viewBox) -->
+                        <Path Fill="#FFDD00"
+                              Width="14" Height="14"
+                              Stretch="Uniform"
+                              Data="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-.779-1.638-.783-.949-1.92-1.503-3.13-1.528-2.072-.043-10.09-.043-12.162 0-1.21.025-2.347.579-3.13 1.528-.391.475-.66 1.04-.779 1.638L.094 6.415C-.2 7.893.226 9.395 1.258 10.518c.866.942 2.074 1.517 3.376 1.606l.872 7.15c.16 1.312 1.272 2.316 2.593 2.316h7.792c1.321 0 2.433-1.004 2.593-2.316l.872-7.15c1.302-.089 2.51-.664 3.376-1.606 1.032-1.123 1.458-2.625 1.164-4.103zm-4.717 11.238c-.053.438-.424.772-.865.772H6.842c-.441 0-.812-.334-.865-.772L5.203 11.21h9.984l-.772 6.443zM18.8 8.875c-.461.502-1.106.809-1.802.857L16.8 8.077h-1.6l.32-2.667h1.472c.696.015 1.349.332 1.797.872.209.254.353.556.417.876.157.79-.045 1.593-.606 2.207z"/>
+                    </Button>
+
                     <Button Content="Sweep Windows"
                             Style="{StaticResource ActionButtonStyle}"
                             Click="OnSweepClicked"
