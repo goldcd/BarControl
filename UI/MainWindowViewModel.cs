@@ -257,7 +257,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
             if (_selectedSoundbar != value)
             {
                 _selectedSoundbar = value;
-                if (value != null)
+                // Only persist the soundbar identifier if selecting a non-primary device,
+                // so temporary fallbacks during display re-enumeration don't overwrite saved settings.
+                if (value != null && !value.IsOsPrimary)
                 {
                     _settings.SelectedSoundbarIdentifier = !string.IsNullOrEmpty(value.HardwareId) ? value.HardwareId : value.FriendlyName;
                     SaveSettings();
@@ -849,7 +851,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
                            ?? Displays.FirstOrDefault(d => !d.IsOsPrimary)
                            ?? Displays.FirstOrDefault();
 
-        UpdateExcludedSettingsList();
+        // Note: Do NOT call UpdateExcludedSettingsList() here. Calling it during LoadDisplays()
+        // would wipe out saved excluded identifiers if the soundbar was temporarily in standby/disconnected!
         SyncConfiguration();
         UpdateAudioKeepAliveTargets();
         UpdateBitstreamProxyTarget();
@@ -911,15 +914,27 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     private void UpdateExcludedSettingsList()
     {
-        _settings.ExcludedIdentifiers.Clear();
-        foreach (var d in Displays.Where(d => d.IsExcluded && !d.IsOsPrimary && !d.IsTargetPrimary))
+        // Synchronize currently connected displays into the saved excluded list without wiping
+        // settings for temporarily disconnected devices (e.g. soundbars in sleep/standby).
+        foreach (var d in Displays)
         {
-            if (!string.IsNullOrEmpty(d.HardwareId))
-                _settings.ExcludedIdentifiers.Add(d.HardwareId);
-            else if (!string.IsNullOrEmpty(d.FriendlyName))
-                _settings.ExcludedIdentifiers.Add(d.FriendlyName);
+            if (d.IsOsPrimary || d.IsTargetPrimary || !d.IsExcluded)
+            {
+                // Remove if unexcluded or primary
+                if (!string.IsNullOrEmpty(d.HardwareId)) _settings.ExcludedIdentifiers.Remove(d.HardwareId);
+                if (!string.IsNullOrEmpty(d.FriendlyName)) _settings.ExcludedIdentifiers.Remove(d.FriendlyName);
+                if (!string.IsNullOrEmpty(d.DeviceName)) _settings.ExcludedIdentifiers.Remove(d.DeviceName);
+            }
             else
-                _settings.ExcludedIdentifiers.Add(d.DeviceName);
+            {
+                // Add preferred identifier if not already present
+                string idToAdd = !string.IsNullOrEmpty(d.HardwareId) ? d.HardwareId :
+                                (!string.IsNullOrEmpty(d.FriendlyName) ? d.FriendlyName : d.DeviceName);
+                if (!string.IsNullOrEmpty(idToAdd) && !_settings.ExcludedIdentifiers.Contains(idToAdd))
+                {
+                    _settings.ExcludedIdentifiers.Add(idToAdd);
+                }
+            }
         }
     }
 
