@@ -1,6 +1,7 @@
 # BarControl
 
-A lightweight Windows system tray utility designed for seamless HDMI soundbar and AV receiver integration. BarControl solves the everyday headaches of connecting an HDMI soundbar to a PC: guarding phantom displays, preventing audio sleep/clipping, bridging Dolby Atmos volume controls, and providing **HDMI-CEC hardware power & volume management** via the **Pulse-Eight USB-CEC Adapter**.
+A lightweight Windows system tray utility designed for seamless HDMI soundbar and AV receiver integration. BarControl solves the everyday headaches of connecting an HDMI soundbar to a PC: guarding phantom displays, preventing audio sleep/clipping, bridging Dolby Atmos volume controls, and optionally providing **HDMI-CEC hardware power & volume management** via the **Pulse-Eight USB-CEC Adapter**.
+It fully supersedes the previous NOTM app (https://github.com/goldcd/NOTM). 
 
 ![BarControl Screenshot](Assets/barcontrol-ui.png)
 
